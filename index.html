@@ -1,184 +1,513 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<title>数当てバトル</title>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Hundred / ハンドレット（ブラウザ版）</title>
 <style>
-body {
-    font-family: Arial, sans-serif;
-    background-color: #eaf2e0;
-    color: #1f3b1f;
-    margin: 0;
-    padding: 20px;
-}
-h1 {
-    color: #2f5e2f;
-    text-align: center;
-}
-button {
-    background-color: #4c8c4a;
-    color: white;
-    padding: 10px;
-    border: none;
-    cursor: pointer;
-    margin: 5px;
-}
-button:disabled {
-    background-color: #a9c7a9;
-    cursor: not-allowed;
-}
-input[type="number"] {
-    padding: 5px;
-    margin: 5px;
-    width: 80px;
-}
-pre {
-    background-color: #f5fff0;
-    border: 1px solid #aacaaa;
-    padding: 10px;
-    white-space: pre-wrap;
-}
+  :root{
+    --bg:#f3f8f4;
+    --panel:#e6f0e7;
+    --accent:#2f7d4f;
+    --accent-2:#1f5a39;
+    --muted:#5f7a66;
+    --win:#1c7c38;
+    --lose:#b34135;
+    --draw:#b38a1a;
+    --border:#cfe2d4;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family: system-ui,-apple-system,"Segoe UI",Roboto,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+    background:var(--bg);
+    color:#203025;
+    line-height:1.6;
+  }
+  header{
+    padding:16px 18px;
+    background:linear-gradient(0deg, #e7f2ea, #f3faf5);
+    border-bottom:1px solid var(--border);
+  }
+  h1{
+    margin:0;
+    font-size:20px;
+    font-weight:700;
+    color:var(--accent);
+    letter-spacing:.02em;
+  }
+  main{ max-width:980px; margin:18px auto 64px; padding:0 16px; }
+  .row{display:flex; gap:16px; flex-wrap:wrap;}
+  .card{
+    background:#fff; border:1px solid var(--border); border-radius:12px; padding:14px;
+    flex:1 1 320px; box-shadow:0 1px 0 rgba(0,0,0,.02);
+  }
+  .card h2{margin:0 0 8px; font-size:16px; color:var(--accent-2);}
+  label{display:inline-block; margin-right:10px; font-size:14px;}
+  select,input[type="number"],input[type="text"]{
+    padding:8px 10px; border:1px solid var(--border); border-radius:8px; background:#fff;
+  }
+  button{
+    padding:9px 14px; border:0; border-radius:10px; background:var(--accent); color:#fff; font-weight:700;
+    cursor:pointer; box-shadow:0 1px 0 rgba(0,0,0,.06);
+  }
+  button.secondary{background:#fff; color:var(--accent-2); border:1px solid var(--border);}
+  button:disabled{opacity:.5; cursor:not-allowed;}
+  .muted{color:var(--muted);}
+  .log{
+    background:var(--panel); border:1px dashed var(--border); border-radius:10px; padding:10px;
+    height:260px; overflow:auto; font-family: ui-monospace, Menlo, Consolas, monospace; font-size:13px; white-space:pre-wrap;
+  }
+  .hands{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .handBox{
+    background:#fff; border:1px solid var(--border); border-radius:10px; padding:10px;
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size:13px; height:160px; overflow:auto;
+  }
+  .badge{display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; margin-left:6px;}
+  .bad-win{background:#dff3e6; color:var(--win);}
+  .bad-lose{background:#f8e3e0; color:var(--lose);}
+  .bad-draw{background:#f8f1db; color:var(--draw);}
+  details>summary{cursor:pointer; color:var(--accent-2);}
+  .rule{background:#fff; border:1px solid var(--border); border-radius:12px; padding:12px;}
+  .sectionTitle{margin:8px 0; color:var(--accent-2); font-weight:700;}
+  .grid-2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .qs-grid{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:6px;}
+  .qs-item{background:#fff; border:1px solid var(--border); border-radius:10px; padding:8px; font-size:13px;}
+  .foot{margin-top:6px; font-size:12px;}
 </style>
 </head>
 <body>
-<h1>数当てバトル</h1>
-<div id="status"></div>
-<div id="question-buttons"></div>
-<div id="number-input"></div>
-<pre id="log"></pre>
+<header>
+  <h1>Hundred / ハンドレット <span class="muted">— 落ち着いた緑のブラウザ版</span></h1>
+</header>
+
+<main>
+  <div class="row">
+    <div class="card">
+      <h2>設定</h2>
+      <div class="grid-2">
+        <label>難易度
+          <select id="level">
+            <option>Easy</option>
+            <option selected>Normal</option>
+            <option>Hard</option>
+          </select>
+        </label>
+        <label>先手
+          <select id="first">
+            <option value="s">先行（あなた）</option>
+            <option value="k">後攻（あなた）</option>
+            <option value="r" selected>ランダム</option>
+          </select>
+        </label>
+        <label>勝利本数
+          <select id="target">
+            <option>5</option><option>9</option><option selected>13</option>
+          </select>
+        </label>
+        <div>
+          <button id="startBtn">ゲーム開始</button>
+          <button class="secondary" id="resetBtn" disabled>リセット</button>
+        </div>
+      </div>
+      <div class="foot muted">※ 2点差で勝利。13-13 はサドンデス。</div>
+    </div>
+
+    <div class="card">
+      <h2>スコア</h2>
+      <div id="score" style="font-size:18px; font-weight:700;">あなた 0 - 0 AI</div>
+      <div class="muted" id="round">—</div>
+      <div id="status" class="foot"></div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="card" style="flex:2">
+      <h2>質問（後攻のとき 1回だけ） <span class="muted">(このターン: <span id="questionState">未実行</span>)</span></h2>
+      <div class="qs-grid">
+        <label class="qs-item"><input type="radio" name="q" value="1"> 1: ワン — この回に限り、下1桁が一致したら小さい方が勝つ</label>
+        <label class="qs-item"><input type="radio" name="q" value="2"> 2: ツー — 10の位が偶数帯？</label>
+        <label class="qs-item"><input type="radio" name="q" value="3"> 3: スリー — 3で割り切れる？</label>
+        <label class="qs-item"><input type="radio" name="q" value="4"> 4: フォー — 宣言4つのどれか？ <br>
+          <input id="q4" type="text" placeholder="例: 11 37 55 97" style="width:100%; margin-top:6px;">
+        </label>
+        <label class="qs-item"><input type="radio" name="q" value="5"> 5: ファイブ — 5で割った余り（0〜4）</label>
+        <label class="qs-item"><input type="radio" name="q" value="6"> 6: シックス — 60未満？</label>
+        <label class="qs-item"><input type="radio" name="q" value="7"> 7: セブン — 数字に7を含む？</label>
+        <label class="qs-item"><input type="radio" name="q" value="8"> 8: エイト — 80〜89？</label>
+        <label class="qs-item"><input type="radio" name="q" value="9"> 9: ナイン — 90以上？</label>
+      </div>
+      <div style="margin-top:10px;">
+        <button id="askBtn" class="secondary" disabled>質問する</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>数字を出す（あなた）</h2>
+      <div>
+        <input id="yourNum" type="number" min="1" max="100" placeholder="1〜100" />
+        <button id="playBtn" disabled>この数字で勝負</button>
+      </div>
+      <div class="foot muted">※ 後攻のターンは「質問する」を先に。質問は1ラウンドに1回だけ。</div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="card">
+      <h2>手札状況</h2>
+      <div class="hands">
+        <div>
+          <div class="muted">あなたの残り（<span id="youCount">100</span>）</div>
+          <div id="youHand" class="handBox"></div>
+        </div>
+        <div>
+          <div class="muted">AIの残り（<span id="aiCount">100</span>）</div>
+          <div id="aiHand" class="handBox"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>ログ</h2>
+      <div id="log" class="log"></div>
+      <div style="margin-top:8px;">
+        <button id="nextBtn" class="secondary" disabled>次のラウンドへ</button>
+      </div>
+    </div>
+  </div>
+
+  <details class="rule" style="margin-top:10px;">
+    <summary>ルール（要点）をひらく</summary>
+    <div class="sectionTitle">基本</div>
+    <div>・各プレイヤーは 1〜100 の手札をそれぞれ所持（共有ではない）。<br>
+         ・1ラウンド：先攻が数字を秘密に決定 → 後攻が質問を1つ使う → 後攻が数字を出す → 判定。</div>
+    <br>
+    <div class="sectionTitle">勝敗の優先順位</div>
+    <div>1) 偶数 vs 奇数 → 奇数の勝ち（絶対）<br>
+         2) 両方3の倍数 → 小さい方の勝ち<br>
+         3) 上記以外 → 大きい方の勝ち</div>
+    <br>
+    <div class="sectionTitle">質問（後攻のみ／毎ラウンド1つ／再使用可）</div>
+    <div>1: ワン … この回に限り、両者の下1桁が一致したら小さい方が勝つ<br>
+         2: ツー … 10の位が偶数帯？<br>
+         3: スリー … 3で割り切れる？<br>
+         4: フォー … 宣言4つのどれか？<br>
+         5: ファイブ … 5で割った余り（0〜4）<br>
+         6: シックス … 60未満？<br>
+         7: セブン … 数字に7を含む？<br>
+         8: エイト … 80〜89？<br>
+         9: ナイン … 90以上？</div>
+    <br>
+    <div class="sectionTitle">勝利条件</div>
+    <div>・勝利本数：5/9/13。2点差で勝利。13-13 はサドンデス。</div>
+  </details>
+
+</main>
 
 <script>
-const totalNumbers = 100;
-let playerNumbers = Array.from({length: totalNumbers}, (_, i) => i + 1);
-let aiNumbers = Array.from({length: totalNumbers}, (_, i) => i + 1);
+const $ = sel => document.querySelector(sel);
+const logEl = $("#log");
+function logLine(txt){ logEl.textContent += txt + "\\n"; logEl.scrollTop = logEl.scrollHeight; }
+function blockFormat(arr){
+  const sorted = [...arr].sort((a,b)=>a-b);
+  let s = "";
+  for(let i=0;i<sorted.length;i++){
+    s += String(sorted[i]).padStart(3," ");
+    if((i+1)%20===0) s += "\\n";
+  }
+  return s.trim();
+}
+function removeFrom(arr, value){ const i = arr.indexOf(value); if(i>=0) arr.splice(i,1); }
 
-let scorePlayer = 0;
-let scoreAI = 0;
-let winTarget = 5;
+// ===== 状態 =====
+let level = "Normal";
+let target = 13;
+let youFirst = null;          // true: あなた先攻
+let round = 0;
+let scoreYou = 0, scoreAI = 0;
+let handYou = [], handAI = [];
+let playerTurnFirst = null;
+let questionUsed = false;     // ① 1ラウンド1回
+let oneUsedThisRound = false; // ワン特例
+let awaitingAnswer = false;   // ② 後攻は質問→数字の順を強制
+let aiFirstSecret = null;     // ③ AI先手の秘密数字（手札から削除済みで保持）
 
-let round = 1;
-let firstPlayer = "player";
-let questionUsed = false;
-let aiChosen = null;
-
-function initGame() {
-    log(`--- ゲーム開始 ---\n`);
-    updateStatus();
-    setupQuestionButtons();
-    nextRound();
+// ===== 判定 =====
+function judgeNormal(first, second){
+  if(first === second) return 0;
+  if(first % 2 === 0 && second % 2 === 1) return -1;
+  if(first % 2 === 1 && second % 2 === 0) return 1;
+  if(first % 3 === 0 && second % 3 === 0) return (first < second ? 1 : -1);
+  return (first > second ? 1 : -1);
+}
+function judgeWithOne(first, second){
+  if(oneUsedThisRound && (first%10 === second%10)){
+    if(first===second) return 0;
+    return (first < second ? 1 : -1);
+  }
+  return judgeNormal(first, second);
 }
 
-function setupQuestionButtons() {
-    const qDiv = document.getElementById("question-buttons");
-    qDiv.innerHTML = "";
-    const questions = [
-        "1: ワン", "2: ツー", "3: スリー", "4: フォー",
-        "5: ファイブ", "6: シックス", "7: セブン", "8: エイト", "9: ナイン"
-    ];
-    questions.forEach((q, idx) => {
-        const btn = document.createElement("button");
-        btn.textContent = q;
-        btn.onclick = () => useQuestion(idx + 1);
-        qDiv.appendChild(btn);
-    });
+// ===== AI =====
+function aiPickFirst(){
+  const prefers = handAI.filter(n => n%2===1 && n%3!==0);
+  if(level==="Easy"){
+    return handAI[Math.floor(Math.random()*handAI.length)];
+  }
+  if(level==="Normal"){
+    if(prefers.length) return prefers[Math.floor(Math.random()*prefers.length)];
+    return handAI[Math.floor(Math.random()*handAI.length)];
+  }
+  if(prefers.length){
+    prefers.sort((a,b)=>a-b);
+    const idx = Math.min(prefers.length-1, Math.floor(prefers.length*0.7));
+    return prefers[idx];
+  }
+  return handAI[Math.floor(Math.random()*handAI.length)];
+}
+function aiChooseQuestion(){
+  const qs = [1,2,3,4,6,7,8,9];
+  if(level==="Easy") return qs[Math.floor(Math.random()*qs.length)];
+  const weighted = [2,3,6,7,8,9,4,1]; // ワンはやや後回し
+  return weighted[Math.floor(Math.random()*weighted.length)];
+}
+function aiPickSecond(oppSecret){
+  const winners = handAI.filter(n => judgeNormal(oppSecret, n)===-1);
+  if(level==="Easy"){
+    const pool = winners.length ? winners : handAI;
+    return pool[Math.floor(Math.random()*pool.length)];
+  }
+  if(winners.length){
+    const prime = winners.filter(n => n%2===1 && n%3!==0);
+    if(prime.length) return Math.max(...prime);
+    const odd3 = winners.filter(n => n%2===1 && n%3===0);
+    if(odd3.length) return Math.max(...odd3);
+    return Math.max(...winners);
+  }
+  const trash = handAI.filter(n => n%2===0 || n%3===0);
+  if(trash.length) return Math.min(...trash);
+  return Math.min(...handAI);
 }
 
-function updateStatus() {
-    document.getElementById("status").innerHTML = 
-        `ラウンド ${round}　スコア: あなた ${scorePlayer} - AI ${scoreAI}<br>` +
-        `あなたの残り(${playerNumbers.length}個)：${playerNumbers.join(", ")}`;
+// ===== UI更新 =====
+function refreshHands(){
+  $("#youHand").textContent = blockFormat(handYou);
+  $("#aiHand").textContent = blockFormat(handAI);
+  $("#youCount").textContent = handYou.length;
+  $("#aiCount").textContent = handAI.length;
+}
+function updateScoreboard(){ $("#score").textContent = `あなた ${scoreYou} - ${scoreAI} AI`; }
+function setControlsForTurn(){
+  $("#askBtn").disabled = true;
+  $("#playBtn").disabled = true;
+  $("#nextBtn").disabled = true;
+  $("#questionState").textContent = questionUsed ? "実行済み" : "未実行";
+  $("#yourNum").value = "";
+
+  if(playerTurnFirst){
+    $("#status").textContent = "あなたが先攻。数字を入力して出してください。AIが質問します。";
+    $("#yourNum").disabled = false;
+    $("#playBtn").disabled = false;
+  }else{
+    $("#status").textContent = "AIが先攻。あなたは質問を1つ選んでから、数字を出してください。";
+    $("#yourNum").disabled = true;
+    $("#playBtn").disabled = true;
+    $("#askBtn").disabled = false;
+  }
 }
 
-function nextRound() {
-    questionUsed = false;
-    aiChosen = null;
-    if (firstPlayer === "ai") {
-        aiChosen = aiChooseNumber();
-        aiNumbers = aiNumbers.filter(n => n !== aiChosen);
-        log(`AIが数字を決めました（非公開）`);
-        showNumberInput();
-    } else {
-        showNumberInput();
+// ===== ラウンド管理 =====
+function startRound(){
+  round += 1;
+  oneUsedThisRound = false;
+  questionUsed = false;
+  awaitingAnswer = false;
+  $("#round").textContent = `— Round ${round} —`;
+  $("#questionState").textContent = "未実行";
+  setControlsForTurn();
+
+  logLine(`\n— Round ${round} —`);
+  logLine(`スコア：あなた ${scoreYou} - AI ${scoreAI}`);
+  logLine(playerTurnFirst ? `あなたが先攻` : `AIが先攻`);
+
+  // ③ AI先手：このタイミングでAIの手札から秘密数字を取り除いて保持
+  if(!playerTurnFirst){
+    aiFirstSecret = aiPickFirst();
+    removeFrom(handAI, aiFirstSecret);
+  }else{
+    aiFirstSecret = null;
+  }
+  refreshHands();
+}
+
+function afterRound(res){
+  if(res===1){ if(playerTurnFirst) scoreYou++; else scoreAI++; }
+  else if(res===-1){ if(playerTurnFirst) scoreAI++; else scoreYou++; }
+  updateScoreboard();
+
+  const t = target;
+  if(Math.max(scoreYou, scoreAI) >= t && Math.abs(scoreYou-scoreAI) >= 2){
+    const winner = (scoreYou>scoreAI) ? "あなた" : "AI";
+    logLine(`\n最終スコア：あなた ${scoreYou} - ${scoreAI} AI`);
+    logLine(`勝者：${winner}`);
+    $("#status").textContent = `勝者：${winner}`;
+    $("#nextBtn").disabled = true; $("#playBtn").disabled = true; $("#askBtn").disabled = true; $("#resetBtn").disabled = false;
+    return;
+  }
+  if(t===13 && scoreYou===13 && scoreAI===13){
+    logLine(`— サドンデス突入 — 次の1本で決着`);
+  }
+  $("#nextBtn").disabled = false;
+  $("#playBtn").disabled = true;
+  $("#askBtn").disabled = true;
+  $("#yourNum").disabled = true;
+}
+
+function nextRound(){
+  playerTurnFirst = !playerTurnFirst;
+  startRound();
+}
+
+// ===== イベント =====
+$("#startBtn").addEventListener("click", ()=>{
+  $("#startBtn").disabled = true;
+  $("#level").disabled = true;
+  $("#first").disabled = true;
+  $("#target").disabled = true;
+
+  level = $("#level").value;
+  target = parseInt($("#target").value,10);
+  const f = $("#first").value;
+  youFirst = (f==="s") ? true : (f==="k" ? false : (Math.random()<0.5));
+  scoreYou = 0; scoreAI = 0; round = 0;
+  handYou = Array.from({length:100}, (_,i)=>i+1);
+  handAI  = Array.from({length:100}, (_,i)=>i+1);
+  playerTurnFirst = youFirst;
+  $("#resetBtn").disabled = false;
+
+  logEl.textContent = "";
+  updateScoreboard();
+  refreshHands();
+  startRound();
+});
+
+$("#resetBtn").addEventListener("click", ()=> location.reload());
+
+$("#askBtn").addEventListener("click", ()=>{
+  if(playerTurnFirst){ alert("先攻のときはあなたは質問できません（AIが質問します）"); return; }
+  if(questionUsed){ alert("このラウンドは既に質問済みです"); return; }
+
+  const checked = document.querySelector('input[name="q"]:checked');
+  if(!checked){ alert("質問を1つ選んでください"); return; }
+  const q = Number(checked.value);
+
+  questionUsed = true;
+  $("#questionState").textContent = "実行済み";
+  $("#askBtn").disabled = true;
+
+  // 回答
+  if(q===1){
+    oneUsedThisRound = true;
+    logLine(`あなたの質問：ワン（特例宣言） → 回答: 情報なし（特例）`);
+  }else if(q===4){
+    const raw = $("#q4").value.trim();
+    const picks = raw.split(/\s+/).map(x=>parseInt(x,10)).filter(x=>x>=1 && x<=100).slice(0,4);
+    if(picks.length!==4){
+      alert("フォーは4つの数字を半角スペース区切りで4つ入れてください（例: 11 37 55 97）");
+      questionUsed = false; $("#questionState").textContent = "未実行"; $("#askBtn").disabled=false; return;
     }
-}
+    const hit = picks.includes(aiFirstSecret);
+    logLine(`あなたの質問：フォー [宣言:${picks.join(", ")}] → 回答: ${hit}`);
+  }else if(q===5){
+    const r = aiFirstSecret % 5;
+    logLine(`あなたの質問：ファイブ → 回答: 余り ${r}`);
+  }else{
+    const map = {
+      2: (n)=>Math.floor(n/10)%2===0,
+      3: (n)=>n%3===0,
+      6: (n)=>n<60,
+      7: (n)=>String(n).includes("7"),
+      8: (n)=>80<=n && n<=89,
+      9: (n)=>n>=90,
+    };
+    const ans = map[q](aiFirstSecret);
+    const label = ["","ワン","ツー","スリー","フォー","ファイブ","シックス","セブン","エイト","ナイン"][q];
+    logLine(`あなたの質問：${label} → 回答: ${ans}`);
+  }
 
-function showNumberInput() {
-    const nDiv = document.getElementById("number-input");
-    nDiv.innerHTML = "";
-    const input = document.createElement("input");
-    input.type = "number";
-    input.min = 1;
-    input.max = 100;
-    input.id = "player-number";
-    const btn = document.createElement("button");
-    btn.textContent = "出す";
-    btn.onclick = submitNumber;
-    nDiv.appendChild(input);
-    nDiv.appendChild(btn);
-}
+  // 後攻は質問後に数字入力を解放
+  awaitingAnswer = true;
+  $("#yourNum").disabled = false;
+  $("#playBtn").disabled = false;
+});
 
-function useQuestion(qNum) {
-    if (questionUsed) {
-        alert("このラウンドでは質問は1回までです");
-        return;
+$("#playBtn").addEventListener("click", ()=>{
+  const val = parseInt($("#yourNum").value,10);
+  if(!(val>=1 && val<=100)){ alert("1〜100の整数を入力"); return; }
+  if(!handYou.includes(val)){ alert("その数字はあなたの手札には残っていない"); return; }
+
+  if(playerTurnFirst){
+    // あなた先攻：あなた→AI質問→AI後攻
+    removeFrom(handYou, val);
+
+    // AIの質問（自動）
+    const q = aiChooseQuestion();
+    const label = ["","ワン","ツー","スリー","フォー","ファイブ","シックス","セブン","エイト","ナイン"][q];
+    if(q===1){
+      oneUsedThisRound = true;
+      logLine(`AIの質問：ワン（特例宣言）`);
+    }else if(q===4){
+      const picks = [];
+      const pool = [...handYou];
+      for(let i=0;i<Math.min(4,pool.length);i++){
+        const idx = Math.floor(Math.random()*pool.length);
+        picks.push(pool.splice(idx,1)[0]);
+      }
+      const hit = picks.includes(val);
+      logLine(`AIの質問：フォー [宣言:${picks.join(", ")}] → 回答: ${hit}`);
+    }else if(q===5){
+      const r = val%5;
+      logLine(`AIの質問：ファイブ → 回答: 余り ${r}`);
+    }else{
+      const map = {
+        2: (n)=>Math.floor(n/10)%2===0,
+        3: (n)=>n%3===0,
+        6: (n)=>n<60,
+        7: (n)=>String(n).includes("7"),
+        8: (n)=>80<=n && n<=89,
+        9: (n)=>n>=90,
+      };
+      const ans = map[q](val);
+      logLine(`AIの質問：${label} → 回答: ${ans}`);
     }
-    questionUsed = true;
-    const answer = aiAnswer(qNum);
-    log(`質問${qNum} の回答: ${answer}`);
-}
 
-function submitNumber() {
-    const val = parseInt(document.getElementById("player-number").value);
-    if (isNaN(val) || !playerNumbers.includes(val)) {
-        alert("未使用の1〜100の数字を入力してください");
-        return;
-    }
-    if (firstPlayer === "player") {
-        aiChosen = aiChooseNumber();
-        aiNumbers = aiNumbers.filter(n => n !== aiChosen);
-    }
-    playerNumbers = playerNumbers.filter(n => n !== val);
-    log(`出した数字：あなた ${val} / AI ${aiChosen}`);
-    judge(val, aiChosen);
-}
+    const aiSecond = aiPickSecond(val);
+    removeFrom(handAI, aiSecond);
+    refreshHands();
 
-function aiChooseNumber() {
-    return aiNumbers[Math.floor(Math.random() * aiNumbers.length)];
-}
+    const res = judgeWithOne(val, aiSecond);
+    logLine(`今回の数字 → 先攻:${val} / 後攻:${aiSecond}${oneUsedThisRound && (val%10===aiSecond%10)? "（ワン特例）":""}`);
+    if(res===1) logLine("結果：先攻の勝ち");
+    else if(res===-1) logLine("結果：後攻の勝ち");
+    else logLine("結果：引き分け");
+    afterRound(res);
 
-function aiAnswer(qNum) {
-    switch(qNum) {
-        case 1: return "ワン判定";
-        default: return "未実装";
-    }
-}
+  }else{
+    // あなた後攻：質問→（必須）→数字
+    if(!questionUsed){ alert("まず質問してください（後攻は質問必須）"); return; }
+    removeFrom(handYou, val);
+    refreshHands();
 
-function judge(p, a) {
-    let winner;
-    // ワン特例
-    if ((p % 10) === (a % 10)) {
-        winner = (p < a) ? "player" : "ai";
-    } else if ((p % 2) !== (a % 2)) {
-        winner = (p % 2 === 1) ? "player" : "ai";
-    } else if (p % 3 === 0 && a % 3 === 0) {
-        winner = (p < a) ? "player" : "ai";
-    } else {
-        winner = (p > a) ? "player" : "ai";
-    }
+    const res = judgeWithOne(aiFirstSecret, val);
+    logLine(`今回の数字 → 先攻:${aiFirstSecret} / 後攻:${val}${oneUsedThisRound && (aiFirstSecret%10===val%10)? "（ワン特例）":""}`);
+    if(res===1) logLine("結果：先攻の勝ち");
+    else if(res===-1) logLine("結果：後攻の勝ち");
+    else logLine("結果：引き分け");
+    afterRound(res);
+  }
+});
 
-    if (winner === "player") scorePlayer++;
-    else scoreAI++;
-
-    log(`${winner === "player" ? "あなた" : "AI"}の勝ち！`);
-    round++;
-    updateStatus();
-}
-
-function log(msg) {
-    document.getElementById("log").textContent += msg + "\n";
-}
-
-initGame();
+$("#nextBtn").addEventListener("click", nextRound);
 </script>
 </body>
 </html>
