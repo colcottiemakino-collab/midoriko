@@ -261,13 +261,25 @@ function judgeNormal(first, second){
   return (first > second ? 1 : -1);
 }
 function judgeWithOne(first, second){
-  if(oneUsedThisRound && (first%10 === second%10)){
-    if(first===second) return 0;
-    return (first < second ? 1 : -1);
+  // ワン特例：下1桁が一致 & 片方が「1桁（1〜9）」なら、その1桁側が勝つ
+  if(oneUsedThisRound && (first % 10 === second % 10)){
+    const firstIsOneDigit  = (first >= 1 && first <= 9);
+    const secondIsOneDigit = (second >= 1 && second <= 9);
+
+    if(firstIsOneDigit && !secondIsOneDigit) return 1;   // 先攻が1桁 → 先攻勝ち
+    if(secondIsOneDigit && !firstIsOneDigit) return -1;  // 後攻が1桁 → 後攻勝ち
+
+    // 両方1桁で下1桁一致 ⇒ 同じ数字のはず（同値以外は一致しない）
+    if(firstIsOneDigit && secondIsOneDigit){
+      if(first === second) return 0;                     // 同じ数字なら引き分け
+      // （理屈上ここに来ないが安全のため）
+      return (first > second ? 1 : -1);
+    }
+    // どちらも1桁でない ⇒ ワン特例は適用しない
   }
+  // 通常判定（偶奇優先 → 両3倍数は小さい方 → それ以外は大きい方）
   return judgeNormal(first, second);
 }
-
 /* ===== AI ===== */
 function aiPickFirst(){
   const prefers = handAI.filter(n => n%2===1 && n%3!==0);
@@ -516,4 +528,5 @@ $("#playBtn").addEventListener("click", ()=>{
 </script>
 </body>
 </html>
+
 
