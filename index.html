@@ -1,533 +1,331 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Hundred / ハンドレット（ブラウザ版）</title>
-<style>
-  :root{
-    --bg:#f3f8f4;
-    --panel:#e6f0e7;
-    --accent:#2f7d4f;   /* メイン緑 */
-    --accent-2:#1f5a39; /* 深い緑 */
-    --muted:#5f7a66;
-    --win:#1c7c38;
-    --lose:#b34135;
-    --draw:#b38a1a;
-    --border:#cfe2d4;
-  }
-  *{box-sizing:border-box;}
-  body{
-    margin:0;
-    font-family: system-ui,-apple-system,"Segoe UI",Roboto,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
-    background:var(--bg);
-    color:#203025;
-    line-height:1.6;
-  }
-  header{
-    padding:16px 18px;
-    background:linear-gradient(0deg, #e7f2ea, #f3faf5);
-    border-bottom:1px solid var(--border);
-  }
-  h1{
-    margin:0;
-    font-size:20px;
-    font-weight:700;
-    color:var(--accent);
-    letter-spacing:.02em;
-  }
-  main{ max-width:980px; margin:18px auto 64px; padding:0 16px; }
-  .row{display:flex; gap:16px; flex-wrap:wrap;}
-  .card{
-    background:#fff; border:1px solid var(--border); border-radius:12px; padding:14px;
-    flex:1 1 320px; box-shadow:0 1px 0 rgba(0,0,0,.02);
-  }
-  .card h2{margin:0 0 8px; font-size:16px; color:var(--accent-2);}
-  label{display:inline-block; margin-right:10px; font-size:14px;}
-  select,input[type="number"],input[type="text"]{
-    padding:8px 10px; border:1px solid var(--border); border-radius:8px; background:#fff;
-  }
-  button{
-    padding:9px 14px; border:0; border-radius:10px; background:var(--accent); color:#fff; font-weight:700;
-    cursor:pointer; box-shadow:0 1px 0 rgba(0,0,0,.06);
-  }
-  button.secondary{background:#fff; color:var(--accent-2); border:1px solid var(--border);}
-  button:disabled{opacity:.5; cursor:not-allowed;}
-  /* 質問ボタンを深い緑で強調 */
-  #askBtn{ background: var(--accent-2); }
-  #askBtn:disabled{ opacity:.5; }
-  .muted{color:var(--muted);}
-  .log{
-    background:var(--panel); border:1px dashed var(--border); border-radius:10px; padding:10px;
-    height:260px; overflow:auto; font-family: ui-monospace, Menlo, Consolas, monospace; font-size:13px;
-    white-space:pre-wrap;
-  }
-  .hands{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-  .handBox{
-    background:#fff; border:1px solid var(--border); border-radius:10px; padding:10px;
-    font-family: ui-monospace, Menlo, Consolas, monospace; font-size:13px; height:160px; overflow:auto;
-    white-space:pre-wrap;
-  }
-  details>summary{cursor:pointer; color:var(--accent-2);}
-  .rule{background:#fff; border:1px solid var(--border); border-radius:12px; padding:12px;}
-  .sectionTitle{margin:8px 0; color:var(--accent-2); font-weight:700;}
-  .grid-2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
-  .qs-grid{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:6px;}
-  .qs-item{background:#fff; border:1px solid var(--border); border-radius:10px; padding:8px; font-size:13px;}
-  .foot{margin-top:6px; font-size:12px;}
-</style>
-</head>
-<body>
-<header>
-  <h1>Hundred / ハンドレット <span class="muted">— 緑テーマ２</span></h1>
-</header>
+# -*- coding: utf-8 -*-
+"""
+Number Duel – Full Fixed Version
+- 早期リーク完全封止：削除は「同時公開→判定→その後」のみ
+- 述語は辞書で安定マップ（ツー/スリーなどの配線ズレ防止）
+- AI質問→ユーザー回答は opponent_candidates にのみ反映（available は触らない）
+- ログでデバッグ容易化
+"""
 
-<main>
-  <div class="row">
-    <div class="card">
-      <h2>設定</h2>
-      <div class="grid-2">
-        <label>難易度
-          <select id="level">
-            <option>Easy</option>
-            <option selected>Normal</option>
-            <option>Hard</option>
-          </select>
-        </label>
-        <label>先手
-          <select id="first">
-            <option value="s">先行（あなた）</option>
-            <option value="k">後攻（あなた）</option>
-            <option value="r" selected>ランダム</option>
-          </select>
-        </label>
-        <label>勝利本数
-          <select id="target">
-            <option>5</option><option>9</option><option selected>13</option>
-          </select>
-        </label>
-        <div>
-          <button id="startBtn">ゲーム開始</button>
-          <button class="secondary" id="resetBtn" disabled>リセット</button>
-        </div>
-      </div>
-      <div class="foot muted">※ 2点差で勝利。</div>
-    </div>
+from __future__ import annotations
+from dataclasses import dataclass, field
+from typing import Callable, Dict, List, Optional, Set, Tuple
+import random
+import sys
 
-    <div class="card">
-      <h2>スコア</h2>
-      <div id="score" style="font-size:18px; font-weight:700;">あなた 0 - 0 AI</div>
-      <div class="muted" id="round">—</div>
-      <div id="status" class="foot"></div>
-    </div>
-  </div>
+# =========================
+# 述語（質問）レジストリ
+# =========================
 
-  <div class="row">
-    <div class="card" style="flex:2">
-      <h2>質問（後攻のとき 1回だけ） <span class="muted">(このターン: <span id="questionState">未実行</span>)</span></h2>
-      <div class="qs-grid">
-        <label class="qs-item"><input type="radio" name="q" value="1"> 1: ワン — この回に限り、こっちの１桁の数が相手の下1桁に一致したら勝つ</label>
-        <label class="qs-item"><input type="radio" name="q" value="2"> 2: ツー — 10の位が偶数帯？</label>
-        <label class="qs-item"><input type="radio" name="q" value="3"> 3: スリー — 3で割り切れる？</label>
-        <label class="qs-item"><input type="radio" name="q" value="4"> 4: フォー — 宣言4つのどれか？ <br>
-          <input id="q4" type="text" placeholder="例: 11 37 55 97" style="width:100%; margin-top:6px;">
-        </label>
-        <label class="qs-item"><input type="radio" name="q" value="5"> 5: ファイブ — 5で割った余り（0〜4）</label>
-        <label class="qs-item"><input type="radio" name="q" value="6"> 6: シックス — 60未満？</label>
-        <label class="qs-item"><input type="radio" name="q" value="7"> 7: セブン — 数字に7を含む？</label>
-        <label class="qs-item"><input type="radio" name="q" value="8"> 8: エイト — 80〜89？</label>
-        <label class="qs-item"><input type="radio" name="q" value="9"> 9: ナイン — 90以上？</label>
-      </div>
-      <div style="margin-top:10px;">
-        <button id="askBtn">質問する</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>数字を出す（あなた）</h2>
-      <div>
-        <input id="yourNum" type="number" min="1" max="100" placeholder="1〜100" />
-        <button id="playBtn" disabled>この数字で勝負</button>
-      </div>
-      <div class="foot muted">※ 後攻のターンは「質問する」を先に。質問は1ラウンドに1回だけ。</div>
-    </div>
-  </div>
-
-  <div class="row">
-    <div class="card">
-      <h2>手札状況</h2>
-      <div class="hands">
-        <div>
-          <div class="muted">あなたの残り（<span id="youCount">100</span>）</div>
-          <div id="youHand" class="handBox"></div>
-        </div>
-        <div>
-          <div class="muted">AIの残り（<span id="aiCount">100</span>）</div>
-          <div id="aiHand" class="handBox"></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>ログ</h2>
-      <div id="log" class="log"></div>
-    </div>
-  </div>
-
-  <details class="rule" style="margin-top:10px;">
-    <summary>ルール（要点）をひらく</summary>
-    <div class="sectionTitle">基本</div>
-    <div>・各プレイヤーは 1〜100 の手札をそれぞれ所持（共有ではない）。<br>
-         ・1ラウンド：先攻が数字を秘密に決定 → 後攻が質問を1つ使う → 後攻が数字を出す → 判定。</div>
-    <br>
-    <div class="sectionTitle">勝敗の優先順位</div>
-    <div>1) 偶数 vs 奇数 → 奇数の勝ち（絶対）<br>
-         2) 両方3の倍数 → 小さい方の勝ち<br>
-         3) 上記以外 → 大きい方の勝ち</div>
-    <br>
-    <div class="sectionTitle">質問（後攻のみ／毎ラウンド1つ／再使用可）</div>
-    <div>1: ワン … この回に限り、こっちの1桁の数字が相手の下1桁に一致したら勝つ<br>
-         2: ツー … 10の位が偶数帯？<br>
-         3: スリー … 3で割り切れる？<br>
-         4: フォー … 宣言4つのどれか？<br>
-         5: ファイブ … 5で割った余り（0〜4）<br>
-         6: シックス … 60未満？<br>
-         7: セブン … 数字に7を含む？<br>
-         8: エイト … 80〜89？<br>
-         9: ナイン … 90以上？</div>
-    <br>
-    <div class="sectionTitle">勝利条件</div>
-    <div>・勝利本数：5/9/13。いずれも到達かつ2点差で勝利。</div>
-  </details>
-</main>
-
-<script>
-/* ===== ユーティリティ ===== */
-const $ = sel => document.querySelector(sel);
-const logEl = $("#log");
-function logLine(txt){
-  // TextNodeとして追加 → \n が確実に改行として表示される
-  logEl.appendChild(document.createTextNode(txt + "\n"));
-  logEl.scrollTop = logEl.scrollHeight;
-}
-function blockFormat(arr){
-  const sorted = [...arr].sort((a,b)=>a-b);
-  let s = "";
-  for(let i=0;i<sorted.length;i++){
-    s += String(sorted[i]).padStart(3," ");
-    if((i+1)%20===0) s += "\n";
-  }
-  return s.trim();
-}
-function removeFrom(arr, value){
-  const idx = arr.indexOf(value);
-  if(idx>=0) arr.splice(idx,1);
+# 述語本体
+PREDICATES: Dict[str, Callable[[int], bool]] = {
+    "one":   lambda x: True,                 # 1で割り切れる（常にTrue）…デモ用
+    "two":   lambda x: (x % 2 == 0),         # 偶数
+    "three": lambda x: (x % 3 == 0),         # 3の倍数
+    "five":  lambda x: (x % 5 == 0),         # 5の倍数
+    "seven": lambda x: (x % 7 == 0),         # 7の倍数
+    "nine":  lambda x: (x % 9 == 0),         # 9の倍数
+    # “eight”はゲーム仕様に合わせて定義を選ぶ：
+    # 例1：10の位が8 or 末尾8（80-89 or _8）→心理釣り系
+    "eight": lambda x: (x // 10 == 8) or (x % 10 == 8),
 }
 
-/* ===== シンプルなビープ音（ラウンド切り替え） ===== */
-let audioCtx = null;
-function beep(){
-  try{
-    if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
-    const o = audioCtx.createOscillator();
-    const g = audioCtx.createGain();
-    o.type = "sine";
-    o.frequency.value = 880;     // 高めの小さな「ポーン」
-    g.gain.value = 0.04;         // 音量かなり小さめ
-    o.connect(g); g.connect(audioCtx.destination);
-    o.start();
-    setTimeout(()=>{ o.stop(); }, 120);
-  }catch(e){ /* 音が出せない環境は無視 */ }
+# ラベルの正規化（絶対に配列順に依存しない）
+ALIAS: Dict[str, str] = {
+    # two
+    "2": "two", "two": "two", "ツー": "two", "トゥー": "two", "偶数": "two",
+    # three
+    "3": "three", "three": "three", "スリー": "three", "三": "three",
+    # five
+    "5": "five", "five": "five", "ファイブ": "five", "五": "five",
+    # seven
+    "7": "seven", "seven": "seven", "セブン": "seven", "七": "seven",
+    # eight
+    "8": "eight", "eight": "eight", "エイト": "eight", "八": "eight",
+    # nine
+    "9": "nine", "nine": "nine", "ナイン": "nine", "九": "nine",
+    # one
+    "1": "one", "one": "one", "ワン": "one", "一": "one",
 }
 
-/* ===== 状態 ===== */
-let level = "Normal";
-let target = 13;
-let youFirst = null;          // true: あなた先攻
-let round = 0;
-let scoreYou = 0, scoreAI = 0;
-let handYou = [], handAI = [];
-let playerTurnFirst = null;
-let questionUsed = false;     // 1ラウンド1回
-let oneUsedThisRound = false; // ワン特例
-let aiFirstSecret = null;     // AI先手の秘密数字（手札から除去済みで保持）
+def resolve_predicate(label: str) -> Tuple[str, Callable[[int], bool]]:
+    """ユーザー表示ラベル（日本語/数字/英語）→ 述語キーと関数に正規化"""
+    key = ALIAS.get(label, label).lower()
+    if key not in PREDICATES:
+        raise KeyError(f"未知の質問ラベル: {label}（正規化キー: {key}）")
+    return key, PREDICATES[key]
 
-/* ===== 判定 ===== */
-function judgeNormal(first, second){
-  if(first === second) return 0;
-  if(first % 2 === 0 && second % 2 === 1) return -1;
-  if(first % 2 === 1 && second % 2 === 0) return 1;
-  if(first % 3 === 0 && second % 3 === 0) return (first < second ? 1 : -1);
-  return (first > second ? 1 : -1);
-}
-function judgeWithOne(first, second){
-  // ワン特例：下1桁が一致 & 片方が「1桁（1〜9）」なら、その1桁側が勝つ
-  if(oneUsedThisRound && (first % 10 === second % 10)){
-    const firstIsOneDigit  = (first >= 1 && first <= 9);
-    const secondIsOneDigit = (second >= 1 && second <= 9);
+# =========================
+# ユーティリティ
+# =========================
 
-    if(firstIsOneDigit && !secondIsOneDigit) return 1;   // 先攻が1桁 → 先攻勝ち
-    if(secondIsOneDigit && !firstIsOneDigit) return -1;  // 後攻が1桁 → 後攻勝ち
+def info_split_score(candidates: Set[int], pred: Callable[[int], bool]) -> float:
+    """情報量っぽいスコア（分割が50:50に近いほど高評価）"""
+    if not candidates:
+        return -1.0
+    t = sum(1 for x in candidates if pred(x))
+    f = len(candidates) - t
+    # 50:50 で1.0、片寄るほど0に近づく
+    p = abs(t - f) / float(len(candidates))
+    return 1.0 - p
 
-    // 両方1桁で下1桁一致 ⇒ 同じ数字のはず（同値以外は一致しない）
-    if(firstIsOneDigit && secondIsOneDigit){
-      if(first === second) return 0;                     // 同じ数字なら引き分け
-      // （理屈上ここに来ないが安全のため）
-      return (first > second ? 1 : -1);
-    }
-    // どちらも1桁でない ⇒ ワン特例は適用しない
-  }
-  // 通常判定（偶奇優先 → 両3倍数は小さい方 → それ以外は大きい方）
-  return judgeNormal(first, second);
-}
-/* ===== AI ===== */
-function aiPickFirst(){
-  const prefers = handAI.filter(n => n%2===1 && n%3!==0);
-  if(level==="Easy"){
-    return handAI[Math.floor(Math.random()*handAI.length)];
-  }
-  if(level==="Normal"){
-    if(prefers.length) return prefers[Math.floor(Math.random()*prefers.length)];
-    return handAI[Math.floor(Math.random()*handAI.length)];
-  }
-  if(prefers.length){
-    prefers.sort((a,b)=>a-b);
-    const idx = Math.min(prefers.length-1, Math.floor(prefers.length*0.7));
-    return prefers[idx];
-  }
-  return handAI[Math.floor(Math.random()*handAI.length)];
-}
-function aiChooseQuestion(){
-  const qs = [1,2,3,4,6,7,8,9];
-  if(level==="Easy") return qs[Math.floor(Math.random()*qs.length)];
-  const weighted = [2,3,6,7,8,9,4,1];
-  return weighted[Math.floor(Math.random()*weighted.length)];
-}
-function aiPickSecond(oppSecret){
-  const winners = handAI.filter(n => judgeNormal(oppSecret, n)===-1);
-  if(level==="Easy"){
-    const pool = winners.length ? winners : handAI;
-    return pool[Math.floor(Math.random()*pool.length)];
-  }
-  if(winners.length){
-    const prime = winners.filter(n => n%2===1 && n%3!==0);
-    if(prime.length) return Math.max(...prime);
-    const odd3 = winners.filter(n => n%2===1 && n%3===0);
-    if(odd3.length) return Math.max(...odd3);
-    return Math.max(...winners);
-  }
-  const trash = handAI.filter(n => n%2===0 || n%3===0);
-  if(trash.length) return Math.min(...trash);
-  return Math.min(...handAI);
-}
+def choose_best_question(candidates: Set[int], keys_priority: List[str]) -> str:
+    """候補集合を二分しやすい質問を選ぶ。優先キーでタイも破る。"""
+    best_key = None
+    best_score = -1.0
+    for k in keys_priority:
+        pred = PREDICATES[k]
+        s = info_split_score(candidates, pred)
+        if s > best_score:
+            best_score, best_key = s, k
+    return best_key or keys_priority[0]
 
-/* ===== UI更新 ===== */
-function refreshHands(){
-  $("#youHand").textContent = blockFormat(handYou);
-  $("#aiHand").textContent = blockFormat(handAI);
-  $("#youCount").textContent = handYou.length;
-  $("#aiCount").textContent = handAI.length;
-}
-function updateScoreboard(){ $("#score").textContent = `あなた ${scoreYou} - ${scoreAI} AI`; }
-function setControlsForTurn(){
-  $("#questionState").textContent = questionUsed ? "実行済み" : "未実行";
-  $("#yourNum").value = "";
-  $("#playBtn").disabled = true;
-  $("#askBtn").disabled = true;
-  if(playerTurnFirst){
-    $("#status").textContent = "あなたが先攻。数字を入力して出してください。AIが質問します。";
-    $("#yourNum").disabled = false;
-    $("#playBtn").disabled = false;
-  }else{
-    $("#status").textContent = "AIが先攻。あなたは質問を1つ選んでから、数字を出してください。";
-    $("#yourNum").disabled = true;
-    $("#askBtn").disabled = false;
-  }
-}
+# =========================
+# 戦術フック（数字選択）
+# =========================
 
-/* ===== ラウンド管理 ===== */
-function startRound(){
-  round += 1;
-  oneUsedThisRound = false;
-  questionUsed = false;
-  $("#round").textContent = `— Round ${round} —`;
-  $("#questionState").textContent = "未実行";
-  setControlsForTurn();
+def ai_pick_conservative(available: Set[int]) -> int:
+    """序盤は偶数かつ大きめをやや優先（釣りと牽制の中間）"""
+    cand = [x for x in available if x % 2 == 0 and x >= 60]
+    if cand:
+        return random.choice(cand)
+    return random.choice(tuple(available))
 
-  // ログ＆効果音
-  logLine(`\n— Round ${round} —`);
-  logLine(`スコア：あなた ${scoreYou} - AI ${scoreAI}`);
-  logLine(playerTurnFirst ? `あなたが先攻` : `AIが先攻`);
-  beep();
+def ai_pick_three_drop(available: Set[int]) -> int:
+    """三落とし定石の雰囲気（上から3刻みを志向）"""
+    prio = [x for x in available if (x % 3 == 0 and x >= 75)]
+    if prio:
+        return max(prio)  # 上から抑える雰囲気
+    return max(available) if available else 1
 
-  // AI先手：ここで秘密数字を確定し手札から除去
-  if(!playerTurnFirst){
-    aiFirstSecret = aiPickFirst();
-    removeFrom(handAI, aiFirstSecret);
-  }else{
-    aiFirstSecret = null;
-  }
-  refreshHands();
-}
-function finishOrAutoNext(res){
-  if(res===1){ if(playerTurnFirst) scoreYou++; else scoreAI++; }
-  else if(res===-1){ if(playerTurnFirst) scoreAI++; else scoreYou++; }
-  updateScoreboard();
+def ai_pick_90_tsur i(available: Set[int]) -> int:
+    """90釣り定石の雰囲気（90筆頭、他デコイ）"""
+    for k in [90, 88, 80, 85, 70, 99, 98, 96]:
+        if k in available:
+            return k
+    return random.choice(tuple(available))
 
-  // 到達かつ2点差で終了
-  if(Math.max(scoreYou, scoreAI) >= target && Math.abs(scoreYou - scoreAI) >= 2){
-    const winner = (scoreYou>scoreAI) ? "あなた" : "AI";
-    logLine(`\n最終スコア：あなた ${scoreYou} - ${scoreAI} AI`);
-    logLine(`勝者：${winner}`);
-    $("#status").textContent = `勝者：${winner}`;
-    // 操作ロック
-    $("#askBtn").disabled = true;
-    $("#playBtn").disabled = true;
-    $("#yourNum").disabled = true;
-    $("#resetBtn").disabled = false;
-    return;
-  }
-  // 自動で次ラウンド
-  setTimeout(()=>{
-    playerTurnFirst = !playerTurnFirst;
-    startRound();
-  }, 800);
-}
+# =========================
+# 記録用データクラス
+# =========================
 
-/* ===== イベント ===== */
-$("#startBtn").addEventListener("click", ()=>{
-  $("#startBtn").disabled = true;
-  $("#level").disabled = true;
-  $("#first").disabled = true;
-  $("#target").disabled = true;
+@dataclass
+class TurnLog:
+    turn: int
+    question_key: Optional[str] = None
+    question_label: Optional[str] = None
+    answer: Optional[bool] = None
+    candidates_before: Optional[int] = None
+    candidates_after: Optional[int] = None
+    ai_number: Optional[int] = None
+    player_number: Optional[int] = None
+    result: Optional[str] = None   # "Player"/"AI"/"Draw"
 
-  level = $("#level").value;
-  target = parseInt($("#target").value,10);
-  const f = $("#first").value;
-  youFirst = (f==="s") ? true : (f==="k" ? false : (Math.random()<0.5));
-  scoreYou = 0; scoreAI = 0; round = 0;
-  handYou = Array.from({length:100}, (_,i)=>i+1);
-  handAI  = Array.from({length:100}, (_,i)=>i+1);
-  playerTurnFirst = youFirst;
-  $("#resetBtn").disabled = false;
+# =========================
+# 本体
+# =========================
 
-  logEl.textContent = "";
-  updateScoreboard();
-  refreshHands();
-  startRound();
-});
-$("#resetBtn").addEventListener("click", ()=> location.reload());
+class NumberDuel:
+    def __init__(self, low: int = 1, high: int = 100, seed: Optional[int] = None):
+        if seed is not None:
+            random.seed(seed)
 
-$("#askBtn").addEventListener("click", ()=>{
-  if(playerTurnFirst){ alert("先攻のときは質問できません（AIが質問します）"); return; }
-  if(questionUsed){ alert("このラウンドは既に質問済みです"); return; }
-  const checked = document.querySelector('input[name="q"]:checked');
-  if(!checked){ alert("質問を1つ選んでください"); return; }
-  const q = Number(checked.value);
+        self.low = low
+        self.high = high
 
-  questionUsed = true;
-  $("#questionState").textContent = "実行済み";
-  $("#askBtn").disabled = true;
+        # 使える数字（盤面の共有資源）…ターン終了時のみ更新！
+        self.available: Set[int] = set(range(low, high + 1))
 
-  // 回答
-  if(q===1){
-    oneUsedThisRound = true;
-    logLine(`あなたの質問：ワン（特例宣言） → 回答: 情報なし（特例）`);
-  }else if(q===4){
-    const raw = $("#q4").value.trim();
-    const picks = raw.split(/\s+/).map(x=>parseInt(x,10)).filter(x=>x>=1 && x<=100).slice(0,4);
-    if(picks.length!==4){
-      alert("フォーは4つの数字を半角スペース区切りで入力してください（例: 11 37 55 97）");
-      questionUsed = false; $("#questionState").textContent = "未実行"; $("#askBtn").disabled=false; return;
-    }
-    const hit = picks.includes(aiFirstSecret);
-    logLine(`あなたの質問：フォー [宣言:${picks.join(", ")}] → 回答: ${hit}`);
-  }else if(q===5){
-    const rem = aiFirstSecret % 5;
-    logLine(`あなたの質問：ファイブ → 回答: 余り ${rem}`);
-  }else{
-    const map = {
-      2: (n)=>Math.floor(n/10)%2===0,
-      3: (n)=>n%3===0,
-      6: (n)=>n<60,
-      7: (n)=>String(n).includes("7"),
-      8: (n)=>80<=n && n<=89,
-      9: (n)=>n>=90,
-    };
-    const ans = map[q](aiFirstSecret);
-    const label = ["","ワン","ツー","スリー","フォー","ファイブ","シックス","セブン","エイト","ナイン"][q];
-    logLine(`あなたの質問：${label} → 回答: ${ans}`);
-  }
+        # 相手（プレイヤー）の秘匿数字候補（AIの推定用）。質問でのみ削る。
+        self.opponent_candidates: Set[int] = set(range(low, high + 1))
 
-  // 後攻は質問後に数字入力を解放
-  $("#yourNum").disabled = false;
-  $("#playBtn").disabled = false;
-});
+        # ペンディング選択（同時公開のため）
+        self._pending_ai: Optional[int] = None
+        self._pending_player: Optional[int] = None
 
-$("#playBtn").addEventListener("click", ()=>{
-  const val = parseInt($("#yourNum").value,10);
-  if(!(val>=1 && val<=100)){ alert("1〜100の整数を入力"); return; }
-  if(!handYou.includes(val)){ alert("その数字はあなたの手札には残っていない"); return; }
+        # スコア
+        self.score_player = 0
+        self.score_ai = 0
+        self.draws = 0
 
-  if(playerTurnFirst){
-    // あなた先攻
-    removeFrom(handYou, val);
+        # ログ
+        self.logs: List[TurnLog] = []
 
-    // AIの質問（自動）
-    const q = aiChooseQuestion();
-    const label = ["","ワン","ツー","スリー","フォー","ファイブ","シックス","セブン","エイト","ナイン"][q];
-    if(q===1){
-      oneUsedThisRound = true;
-      logLine(`AIの質問：ワン（特例宣言）`);
-    }else if(q===4){
-      const picks = [];
-      const pool = [...handYou];
-      for(let i=0;i<Math.min(4,pool.length);i++){
-        const idx = Math.floor(Math.random()*pool.length);
-        picks.push(pool.splice(idx,1)[0]);
-      }
-      const hit = picks.includes(val);
-      logLine(`AIの質問：フォー [宣言:${picks.join(", ")}] → 回答: ${hit}`);
-    }else if(q===5){
-      const r = val%5;
-      logLine(`AIの質問：ファイブ → 回答: 余り ${r}`);
-    }else{
-      const map = {
-        2: (n)=>Math.floor(n/10)%2===0,
-        3: (n)=>n%3===0,
-        6: (n)=>n<60,
-        7: (n)=>String(n).includes("7"),
-        8: (n)=>80<=n && n<=89,
-        9: (n)=>n>=90,
-      };
-      const ans = map[q](val);
-      logLine(`AIの質問：${label} → 回答: ${ans}`);
-    }
+        # 質問の優先リスト（バランス取りやすい順）
+        self.question_priority = ["two", "three", "five", "seven", "nine", "eight", "one"]
 
-    const aiSecond = aiPickSecond(val);
-    removeFrom(handAI, aiSecond);
-    refreshHands();
+    # ---------- ターンの流れ ----------
+    def ai_ask_question(self) -> Tuple[str, str]:
+        """AIが Yes/No 質問を1つ選ぶ（available は触らない）"""
+        key = choose_best_question(self.opponent_candidates, self.question_priority)
+        label = key  # 表示用、必要なら日本語に置換してもよい
+        # ログひな形追加
+        self.logs.append(TurnLog(turn=len(self.logs) + 1, question_key=key, question_label=label))
+        return key, label
 
-    const res = judgeWithOne(val, aiSecond);
-    logLine(`今回の数字 → 先攻:${val} / 後攻:${aiSecond}${oneUsedThisRound && (val%10===aiSecond%10)? "（ワン特例）":""}`);
-    logLine(res===1?"結果：先攻の勝ち":res===-1?"結果：後攻の勝ち":"結果：引き分け");
-    finishOrAutoNext(res);
+    def apply_player_answer(self, question_key: str, answer_bool: bool) -> None:
+        """プレイヤーがYes/No回答。opponent_candidatesのみ絞る。"""
+        pred = PREDICATES[question_key]
+        lg = self.logs[-1]
+        lg.answer = answer_bool
+        lg.candidates_before = len(self.opponent_candidates)
 
-  }else{
-    // あなた後攻：質問→数字
-    if(!questionUsed){ alert("まず質問してください（後攻は質問必須）"); return; }
-    removeFrom(handYou, val);
-    refreshHands();
+        # ここで available は**絶対に**触らない！ 釣りや質問は相手の候補推定だけ。
+        self.opponent_candidates = {x for x in self.opponent_candidates if pred(x) == answer_bool}
+        lg.candidates_after = len(self.opponent_candidates)
 
-    const res = judgeWithOne(aiFirstSecret, val);
-    logLine(`今回の数字 → 先攻:${aiFirstSecret} / 後攻:${val}${oneUsedThisRound && (aiFirstSecret%10===val%10)? "（ワン特例）":""}`);
-    logLine(res===1?"結果：先攻の勝ち":res===-1?"結果：後攻の勝ち":"結果：引き分け");
-    finishOrAutoNext(res);
-  }
-});
-</script>
-</body>
-</html>
+    def ai_select_number(self) -> None:
+        """AIが今ターンに出す数字を“保留選択”する（削除しない）"""
+        if not self.available:
+            raise RuntimeError("数字が残っていません。")
+        # ここで戦術を切替可能（例：序盤守備→中盤三落とし）
+        # シンプルに候補数で切替する例
+        if len(self.available) >= 50:
+            choice = ai_pick_conservative(self.available)
+        elif len(self.available) >= 25:
+            choice = ai_pick_90_tsur i(self.available)
+        else:
+            choice = ai_pick_three_drop(self.available)
 
+        if choice not in self.available:
+            raise AssertionError("AIが未使用でない数字を選びました。")
+        self._pending_ai = choice
 
+    def player_select_number(self, n: int) -> None:
+        """プレイヤーが今ターンに出す数字を“保留選択”する（削除しない）"""
+        if n not in self.available:
+            raise ValueError(f"{n} は使用できません（未使用のみ）。")
+        self._pending_player = n
 
+    def reveal_and_judge(self) -> Tuple[str, int, int]:
+        """同時公開 → 判定（削除はまだしない）"""
+        if self._pending_ai is None or self._pending_player is None:
+            raise RuntimeError("公開の前に両者の選択が必要です。")
+        ai_n = self._pending_ai
+        pl_n = self._pending_player
+
+        if pl_n > ai_n:
+            res = "Player"
+            self.score_player += 1
+        elif pl_n < ai_n:
+            res = "AI"
+            self.score_ai += 1
+        else:
+            res = "Draw"
+            self.draws += 1
+
+        # ログ更新（削除前）
+        lg = self.logs[-1]
+        lg.ai_number = ai_n
+        lg.player_number = pl_n
+        lg.result = res
+
+        return res, ai_n, pl_n
+
+    def cleanup_after_resolution(self) -> None:
+        """このタイミングで初めて available を削る（早期リーク防止の核心）"""
+        if self._pending_ai is None or self._pending_player is None:
+            raise RuntimeError("クリーンアップ前に公開が必要です。")
+        # 使い終わった数字を盤面から除去（存在する場合のみ）
+        if self._pending_ai in self.available:
+            self.available.remove(self._pending_ai)
+        if self._pending_player in self.available:
+            self.available.remove(self._pending_player)
+
+        # ペンディングをクリア（次ターンに持ち越さない）
+        self._pending_ai = None
+        self._pending_player = None
+
+    def is_finished(self) -> bool:
+        return len(self.available) == 0
+
+    # ---------- デバッグ/可視化 ----------
+    def last_log(self) -> Optional[TurnLog]:
+        return self.logs[-1] if self.logs else None
+
+# =========================
+# CLI
+# =========================
+
+def ask_bool(prompt: str) -> bool:
+    """y/n を True/False にする簡易入力"""
+    while True:
+        s = input(prompt + " [y/n]> ").strip().lower()
+        if s in ("y", "yes", "t", "true", "1"):
+            return True
+        if s in ("n", "no", "f", "false", "0"):
+            return False
+        print("y か n を入力して。")
+
+def main():
+    print("=== Number Duel – Full Fixed Version ===")
+    print("・削除は必ず『同時公開→判定→その後』で実行（早期リークは起きません）")
+    print("・AIの質問は候補集合にのみ反映。available はターン終了まで不変です。\n")
+
+    game = NumberDuel(low=1, high=100, seed=None)
+
+    while not game.is_finished():
+        turn_idx = len(game.logs) + 1
+        print(f"--- Turn {turn_idx} ---  残り（未使用）: {len(game.available)}")
+
+        # 1) AIが質問（Yes/No）
+        q_key, q_label = game.ai_ask_question()
+        # 表示を少し親切に
+        jp = {
+            "two":"偶数？", "three":"3の倍数？", "five":"5の倍数？",
+            "seven":"7の倍数？", "nine":"9の倍数？",
+            "eight":"80台または末尾8？", "one":"常にTrue（デモ）",
+        }.get(q_key, q_key)
+        print(f"AIの質問: {jp}  （key='{q_key}'）")
+        ans = ask_bool("あなたの答えは？")
+
+        # 1.5) 回答を適用（opponent_candidates のみ絞る）
+        game.apply_player_answer(q_key, ans)
+        lg = game.last_log()
+        print(f"候補: {lg.candidates_before} → {lg.candidates_after}")
+
+        # 2) AIは今ターンに出す数字を“保留選択”（available は触らない）
+        game.ai_select_number()
+
+        # 3) プレイヤーの数字を“保留選択”（available は触らない）
+        while True:
+            raw = input("あなたの数字（未使用）> ").strip()
+            if raw.lower() in {"q", "quit", "exit"}:
+                print("中断します。")
+                sys.exit(0)
+            try:
+                n = int(raw)
+            except ValueError:
+                print("整数を入力して。")
+                continue
+            try:
+                game.player_select_number(n)
+                break
+            except ValueError as e:
+                print(e)
+                continue
+
+        # 4) 同時公開 → 判定（ここでも削除はしない）
+        res, ai_n, pl_n = game.reveal_and_judge()
+        print(f"[公開]  AI: {ai_n} / You: {pl_n}  → 結果: {res}")
+
+        # 5) このタイミングで初めて available から削除（唯一の縮小ポイント）
+        game.cleanup_after_resolution()
+
+        # スコア表示
+        print(f"Score  You {game.score_player} - {game.score_ai} AI  (Draw {game.draws})\n")
+
+    print("=== 終局 ===")
+    print(f"最終スコア: You {game.score_player} - {game.score_ai} AI / Draw {game.draws}")
+    print("直近ログ（最大10ターン）:")
+    for lg in game.logs[-10:]:
+        qdisp = lg.question_key or "-"
+        adisp = "-" if lg.answer is None else ("True" if lg.answer else "False")
+        print(
+            f" T{lg.turn}: Q={qdisp} A={adisp} "
+            f"cand {lg.candidates_before}->{lg.candidates_after} "
+            f"| AI {lg.ai_number} vs You {lg.player_number} → {lg.result}"
+        )
+
+if __name__ == "__main__":
+    main()
