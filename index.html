@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>ハンドレッド / Hundred ver 2.5.2</title>
+<title>ハンドレッド / Hundred ver 2.6.1</title>
 <style>
   :root{
     --bg:#0e1a12; --bg2:#122216; --panel:#152a1b; --accent:#35c46e; --accent-2:#2aa55b;
@@ -63,7 +63,7 @@
 </head>
 <body>
 <header>
-  <h1>ハンドレッド / Hundred ver 2.5.2</h1>
+  <h1>ハンドレッド / Hundred ver 2.6.1</h1>
   <span class="tag">緑テーマ</span>
   <span class="tag">同時公開→判定→自動削除（リーク防止）</span>
   <span class="tag">奇数優先＋3の倍数小勝ち</span>
@@ -80,6 +80,7 @@
         <option value="easy">easy</option>
         <option value="normal" selected>normal</option>
         <option value="hard">hard</option>
+        <option value="expert">expert</option>
       </select>
 
       <label>先取本数</label>
@@ -219,7 +220,6 @@ const state = {
   turnStarter: "player",
   asker: "ai",
 
-  // 先取本数
   winTarget: 5,
   deuce: false,
 
@@ -234,7 +234,7 @@ const state = {
 
   qKey:null, qLocked:false, qEvaluated:false,
   qFourSet:[],
-  qAsker:null,                 // ★ 追加：この質問の“質問者”を固定保存
+  qAsker:null,
 
   revealed:false,
   history: {player:[], ai:[]}
@@ -349,6 +349,13 @@ function tactic90Decoy(avail){
   for(const x of arr){ if(x%2===1) return x; }
   return arr[0];
 }
+/* ★追加：大きめ奇数の威嚇（3の倍数かどうかは不問、非3倍数をやや優先） */
+function tacticOddThreat(avail){
+  const odd = [...avail].filter(x=>x%2===1).sort((a,b)=>b-a);
+  if(odd.length===0) return Math.max(...avail);
+  const non3 = odd.filter(x=>x%3!==0);
+  return (non3.length? non3[0] : odd[0]);
+}
 function tacticNormal(avail){
   const arr=[...avail];
   const odd = arr.filter(x=>x%2===1);
@@ -360,13 +367,40 @@ function tacticNormal(avail){
   const ev = arr.filter(x=>x%2===0).sort((a,b)=>a-b);
   return ev.length? ev[0] : Math.max(...arr);
 }
+
+/* ========= AIの出目ロジック（EXPERT対応） ========= */
 function aiPickNumber(){
   const diff = $("#difficulty").value;
+
+  // ★EXPERT：先行は偶数デコイ主体、25%だけ大きめ奇数で威嚇
+  if(diff==="expert"){
+    const starterIsAI = (state.turnStarter==="ai");
+    if(starterIsAI){
+      if(Math.random()<0.75){
+        state.lastTactic = "decoy";
+        return tactic90Decoy(state.availableAI);
+      }else{
+        state.lastTactic = "odd-threat";
+        return tacticOddThreat(state.availableAI);
+      }
+    }else{
+      // 非先行時：90デコイ：奇数威嚇：スリープレスヒント ≒ 0.60：0.25：0.15
+      const r = Math.random();
+      if(r < 0.60){ state.lastTactic="decoy"; return tactic90Decoy(state.availableAI); }
+      if(r < 0.85){ state.lastTactic="odd-threat"; return tacticOddThreat(state.availableAI); }
+      state.lastTactic="sleepless-hint";
+      return tacticNormal(state.availableAI);
+    }
+  }
+
+  // ★Hard（従来維持）：圧を感じたら偶数抜け
   if(diff==="hard" && isSleeplessPressure()){
     const choice = pickEvenEscape(state.availableAI);
     state.lastTactic = "even-escape";
     return choice;
   }
+
+  // easy/normal/hard（既存）
   let useSleepless=false, useDecoy=false;
   if(diff==="hard"){
     const r=Math.random();
@@ -386,15 +420,11 @@ function aiPickNumber(){
 /* ========= 即時回答（qAskerで対象固定） ========= */
 function evaluateQuestionImmediately(){
   if(!state.qKey || state.qEvaluated) return;
-
-  // 質問者はこの質問の“固定値”を参照
   const asker = state.qAsker;
-  if(!asker) return; // まだセットされていない（安全）
+  if(!asker) return;
 
   const def = QDEF[state.qKey];
-  const target = (asker==="ai") ? state.pendingPL : state.pendingAI; // ★ 固定化
-
-  // 対象未確定なら評価保留
+  const target = (asker==="ai") ? state.pendingPL : state.pendingAI;
   if(target==null) return;
 
   if(def.type==="rule"){
@@ -448,11 +478,11 @@ document.querySelectorAll(".qbtn").forEach(btn=>{
     document.querySelectorAll(".qbtn").forEach(b=>b.classList.remove("chosen"));
     btn.classList.add("chosen");
     state.qKey = btn.dataset.q;
-    state.qAsker = "player";            // ★ 固定
+    state.qAsker = "player";
     fourInput.disabled = (state.qKey!=="four");
     if(state.qKey!=="four"){ state.qFourSet=[]; fourInput.value=""; }
     log(`<b>あなたの質問</b>: ${QLABEL[state.qKey]}（このターンはロック）`);
-    evaluateQuestionImmediately();      // 対象が決まっていれば即評価
+    evaluateQuestionImmediately();
     syncRevealButton();
   });
 });
@@ -480,9 +510,22 @@ function buildFourSetFromCandidates(candSet){
   return [...new Set(picks.filter(Number.isInteger))].slice(0,4);
 }
 
-/* ========= AIの質問選択（qAsker固定＋空打ち防止） ========= */
+/* ========= AIの質問選択（EXPERTはスリー優先＋空打ち防止） ========= */
 function aiChooseQuestion(){
   if(state.qLocked) return;
+
+  // ★EXPERT：AIが質問者なら高確率でスリーを選んで継続絞り込み
+  if($("#difficulty").value==="expert" && state.asker==="ai"){
+    state.qKey = (Math.random() < 0.7) ? "three" : null;
+    state.qAsker = "ai";
+    if(state.qKey){
+      log(`<b>AIの質問</b>: ${QLABEL[state.qKey]}`);
+      evaluateQuestionImmediately();
+      return;
+    }
+    // スリーを使わなかった場合のみ通常順序へ
+  }
+
   const order = [];
   const rnd=Math.random();
   if(rnd<0.15) order.push("five");
@@ -491,7 +534,7 @@ function aiChooseQuestion(){
 
   for(const k of order){
     state.qKey = k;
-    state.qAsker = "ai";               // ★ 固定
+    state.qAsker = "ai";
     if(k==="four"){
       const fourSet = buildFourSetFromCandidates(state.oppCandidates);
       if(fourSet.length===0){ continue; }
@@ -500,7 +543,7 @@ function aiChooseQuestion(){
     }else{
       log(`<b>AIの質問</b>: ${QLABEL[k]}`);
     }
-    evaluateQuestionImmediately();     // 対象が決まっていれば即評価
+    evaluateQuestionImmediately();
     return;
   }
 
@@ -524,7 +567,7 @@ function nextTurn(){
     state.turnStarter = (state.turnStarter==="player") ? "ai" : "player";
   }
   state.asker = (state.turnStarter==="player") ? "ai" : "player";
-  state.qAsker = null; // ★ 新ターンでリセット
+  state.qAsker = null;
   turnStarterLabel.textContent = (state.turnStarter==="player") ? "あなた" : "AI";
   askerEl.textContent = (state.asker==="player") ? "あなた" : "AI";
 
@@ -542,9 +585,9 @@ function nextTurn(){
     statusEl.textContent = `対局開始。先取本数は ${state.winTarget}。`;
   }
   if(state.turnStarter==="player"){
-    // プレイヤー先手：AIは質問者
+    // あなた先手：AIは質問者
   }else{
-    // AI先手：AIの手は先に確定させる
+    // AI先手：AIの手を先に確定
     state.pendingAI = aiPickNumber();
   }
 
@@ -555,12 +598,12 @@ function nextTurn(){
 function onPlayerPickedMaybeAdvance(){
   if(state.pendingPL==null){ syncRevealButton(); return; }
   if(state.turnStarter==="player"){
-    if(!state.qKey) aiChooseQuestion();   // ここで qAsker="ai" が固定される
-    evaluateQuestionImmediately();         // あなたの数が決まっているので即評価可能
+    if(!state.qKey) aiChooseQuestion();   // ここで qAsker="ai" が固定
+    evaluateQuestionImmediately();
     if(state.pendingAI==null) state.pendingAI = aiPickNumber();
   }else{
     // AI先手（あなた後攻＝質問者）
-    evaluateQuestionImmediately();         // qAsker が player の場合、AIの数が決まっていれば即評価
+    evaluateQuestionImmediately();
   }
   syncRevealButton();
 }
@@ -578,7 +621,7 @@ function revealAndJudge(){
 
   // ①ワン特例
   if(state.qKey==="one"){
-    const askerIsPlayer = (state.qAsker==="player"); // ★ 固定化した質問者を使う
+    const askerIsPlayer = (state.qAsker==="player");
     const askerNum = askerIsPlayer ? pl : ai;
     const otherNum = askerIsPlayer ? ai : pl;
     if(askerNum>=1 && askerNum<=9 && (askerNum%10)===(otherNum%10)){
