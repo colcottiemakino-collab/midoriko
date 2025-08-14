@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>ハンドレッド / Hundred v2.1.0</title>
+<title>Hundred / ハンドレッド v2.0.1</title>
 <style>
   :root{
     --bg:#0e1a12; --bg2:#122216; --panel:#152a1b; --accent:#35c46e; --accent-2:#2aa55b;
@@ -23,7 +23,6 @@
     box-shadow: 0 10px 20px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.04);}
   .card h2{margin:0 0 10px; font-size:16px; color:var(--accent)}
   .row{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
-  .grow{flex:1}
   select, button{
     background:var(--btn); color:var(--text); border:1px solid var(--border);
     border-radius:10px; padding:8px 10px; font-size:14px;
@@ -56,7 +55,7 @@
   <h1>Hundred / ハンドレッド</h1>
   <span class="tag">緑テーマ</span>
   <span class="tag">同時公開→判定→削除（リーク防止）</span>
-  <span class="tag">v2.0.0</span>
+  <span class="tag">v2.0.1</span>
 </header>
 
 <main>
@@ -108,7 +107,9 @@
   <section class="card">
     <h2>盤面（未使用の数字）</h2>
     <div id="grid" class="grid"></div>
-    <div class="muted" style="margin-top:6px">クリックであなたの数字を選択。先手があなたのターンでは、選んだ瞬間にAIが質問→自動判定→AIも黙って決定します。</div>
+    <div class="muted" style="margin-top:6px">
+      先手があなたのターン：数字クリック → AIが質問を自動判定 → AIも黙って決定 → 公開ボタンが有効化されます。
+    </div>
   </section>
 
   <!-- 右：相手情報＆ログ -->
@@ -177,6 +178,8 @@ const state = {
   score: {you:0, ai:0, draw:0},
   lastTactic: "normal",
   lastQuestion: null,
+  qEvaluated: false,           // ★ 追加：そのターンの質問を評価済みか
+  oppCandBefore: 0             // ★ 追加：ログ用（前件数）
 };
 
 const $ = sel => document.querySelector(sel);
@@ -205,25 +208,23 @@ function renderGrid(){
       cell.classList.add("used");
     }else{
       cell.addEventListener("click", ()=>{
-        // 先手があなたのターン or 後手であなたが選ぶタイミングのときに選択
+        // あなたの選択を確定（トグル）
         state.pendingPL = (state.pendingPL===n ? null : n);
         Array.from(gridEl.children).forEach(c=>c.classList.remove("selected"));
         if(state.pendingPL===n) cell.classList.add("selected");
 
-        // 先手があなたのターンなら、選んだ瞬間に：AIが質問→自動評価→AIも黙って決定
-        if(state.turnStarter==="player"){
+        // 先手があなたのターンなら、クリック直後にAIが自動で動く
+        if(state.turnStarter==="player" && state.pendingPL!=null){
           aiAfterPlayerPicked();
-        }else{
-          // 先手がAIのターンなら、AIはすでに質問＆自選済。あなたが選べば公開へ。
-          $("#btnReveal").disabled = (state.pendingPL==null || state.pendingAI==null);
         }
+        // 両者準備が整っていれば公開ON
+        syncRevealButton();
       });
     }
     gridEl.appendChild(cell);
   }
 }
 
-/* ========= スコア＆ボタン ========= */
 function updateScore(){
   sYou.textContent = state.score.you; sAI.textContent = state.score.ai; sD.textContent = state.score.draw;
 }
@@ -231,14 +232,19 @@ function setButtons({reveal, cleanup}){
   $("#btnReveal").disabled = !reveal;
   $("#btnCleanup").disabled = !cleanup;
 }
+function syncRevealButton(){
+  $("#btnReveal").disabled = !(state.pendingPL!=null && state.pendingAI!=null);
+}
 
 /* ========= 初期化 ========= */
 function resetGame(){
   state.available = new Set(Array.from({length:100},(_,i)=>i+1));
   state.oppCandidates = new Set(Array.from({length:100},(_,i)=>i+1));
   state.pendingAI = null; state.pendingPL = null;
-  state.score = {you:0, ai:0, draw:0}; state.lastTactic="normal"; state.lastQuestion=null;
+  state.score = {you:0, ai:0, draw:0};
+  state.lastTactic="normal"; state.lastQuestion=null; state.qEvaluated=false; state.oppCandBefore=0;
   state.turn = 0;
+
   const starterSel = $("#starter").value;
   state.initialStarter = starterSel;
   state.turnStarter = starterSel==="random" ? (Math.random()<0.5?"player":"ai") : starterSel;
@@ -254,7 +260,7 @@ function resetGame(){
   renderGrid(); renderLists(); updateScore();
   setButtons({reveal:false, cleanup:false});
 
-  // 新しいターンを開始
+  // 新しいターン
   nextTurn();
 }
 
@@ -267,7 +273,7 @@ function tacticSleepless(avail){
 }
 function tactic90Decoy(avail){
   for(const k of ALL_DECOYS){ if(avail.has(k)) return k; }
-  // デコイが枯渇したら最大。ただし85は温存気味。
+  // デコイ枯渇 → 最大。ただし85は温存気味。
   const arr = Array.from(avail).sort((a,b)=>b-a);
   for(const x of arr){ if(x===85 && arr.length>20) continue; return x; }
   return arr[0];
@@ -304,34 +310,33 @@ function aiPickNumber(){
 }
 
 /* ========= 質問（自動評価） ========= */
-function aiAskAndAutoEval(knownPlayerNumberOrNull){
+function aiAskAndMaybeEval(knownPlayerNumberOrNull){
+  // ターン開始時にクリア（安全）
+  state.lastQuestion = null;
+  state.qEvaluated = false;
+
   const key = chooseBestQuestion(state.oppCandidates);
   state.lastQuestion = key;
+
   if(knownPlayerNumberOrNull!=null){
-    // プレイヤーの数字が既に決まっている → 真偽を自動判定して絞る
+    // プレイヤーの数字が既に決まっている → 即自動評価
+    const before = state.oppCandidates.size;
     const truth = !!PREDICATES[key](knownPlayerNumberOrNull);
-    applyQuestionTruth(key, truth);
-    log(`<b>Q</b>: ${QUESTION_JA[key]} → <b>${truth?'Yes':'No'}</b>（自動）  candidates ${state.oppCandidates.sizeBefore}→${state.oppCandidates.size}`);
+    const next = new Set();
+    for(const x of state.oppCandidates){ if(!!PREDICATES[key](x)===truth) next.add(x); }
+    state.oppCandidates = next;
+    state.qEvaluated = true;
+    log(`<b>Q</b>: ${QUESTION_JA[key]} → <b>${truth?'Yes':'No'}</b>（自動） candidates ${before}→${state.oppCandidates.size}`);
   }else{
-    // まだ未決 → ログだけ。真偽は後でプレイヤーが選んだ数字から自動評価
+    // まだ未評価（後で公開前に自動評価する）
     log(`<b>Q</b>: ${QUESTION_JA[key]}（真偽はあなたの選択後に自動評価）`);
   }
-}
-function applyQuestionTruth(key, truth){
-  // ログ用に前件数を一時保持
-  state.oppCandidates.sizeBefore = state.oppCandidates.size;
-  const next = new Set();
-  for(const x of state.oppCandidates){ if(!!PREDICATES[key](x)===truth) next.add(x); }
-  state.oppCandidates = next;
   renderLists();
 }
 
 /* ========= ターン進行 ========= */
 function nextTurn(){
-  // 終局チェック
-  if(state.turn>=state.roundsMax){
-    endGame(); return;
-  }
+  if(state.turn>=state.roundsMax){ endGame(); return; }
   state.turn += 1;
   turnNow.textContent = state.turn.toString();
   turnStarter.textContent = state.turnStarter==="player" ? "あなた" : "AI";
@@ -339,36 +344,58 @@ function nextTurn(){
   Array.from(gridEl.children).forEach(c=>c.classList.remove("selected"));
   setButtons({reveal:false, cleanup:false});
 
+  // ターン冒頭で質問を投げる（先手によって評価タイミングが変わる）
   if(state.turnStarter==="player"){
-    statusEl.textContent = "あなたが先手。このラウンドの数字を盤面から選んで。";
-    // プレイヤーが選ぶまで待機。選んだ瞬間に aiAfterPlayerPicked() が走る。
+    statusEl.textContent = "あなたが先手。数字を選んだ瞬間、AIが質問を自動判定して手を決めます。";
+    aiAskAndMaybeEval(null); // 質問は提示しておく（評価は後で）
   }else{
-    statusEl.textContent = "AIが先手。AIは黙って数字を決め、質問も提示します。あなたは選んで公開へ。";
-    // 1) AIが先に自分の数字を決める（削除はしない）
+    statusEl.textContent = "AIが先手。AIは黙って手を決め、質問も提示します。あなたは選べば公開可能。";
     state.pendingAI = aiPickNumber();
-    // 2) AIが質問（真偽はあなたが選んだ後に自動評価）
-    aiAskAndAutoEval(null);
+    aiAskAndMaybeEval(null); // あなたが選んだ時点で評価
   }
+  renderGrid(); renderLists();
 }
 
 function aiAfterPlayerPicked(){
-  if(state.pendingPL==null) return;
-  // あなたが先手のとき：AIは即質問→自動評価→自分の数字を決める
-  aiAskAndAutoEval(state.pendingPL);
-  state.pendingAI = aiPickNumber();
-  // 両者がそろったので公開可
-  $("#btnReveal").disabled = false;
-  statusEl.textContent = "同時公開できます。";
+  try{
+    if(state.pendingPL==null) return;
+    // 先手=あなた：ここで質問を自動評価し、AIも即決
+    if(!state.qEvaluated){
+      const before = state.oppCandidates.size;
+      const key = state.lastQuestion ?? chooseBestQuestion(state.oppCandidates);
+      state.lastQuestion = key;
+      const truth = !!PREDICATES[key](state.pendingPL);
+      const next = new Set();
+      for(const x of state.oppCandidates){ if(!!PREDICATES[key](x)===truth) next.add(x); }
+      state.oppCandidates = next;
+      state.qEvaluated = true;
+      log(`<b>Q</b>: ${QUESTION_JA[key]} → <b>${truth?'Yes':'No'}</b>（自動） candidates ${before}→${state.oppCandidates.size}`);
+      renderLists();
+    }
+    if(state.pendingAI==null){
+      state.pendingAI = aiPickNumber();
+    }
+    statusEl.textContent = "同時公開できます。";
+  }catch(e){
+    log(`<span class="bad">[Error]</span> ${e?.message||e}`);
+  }
+  syncRevealButton();
 }
 
 /* ========= 公開→判定→削除 ========= */
 function revealAndJudge(){
   if(state.pendingPL==null || state.pendingAI==null){ alert("両者の数字が未確定です。"); return; }
-  // もしAI先手で未評価の質問があれば、ここで自動評価（あなたの選択に基づき）
-  if(state.lastQuestion && state.oppCandidates.sizeBefore===undefined){
+
+  // 未評価の質問があれば、ここで自動評価（AI先手であなたが後から選んだケース）
+  if(!state.qEvaluated && state.lastQuestion){
+    const before = state.oppCandidates.size;
     const truth = !!PREDICATES[state.lastQuestion](state.pendingPL);
-    applyQuestionTruth(state.lastQuestion, truth);
-    log(`→ <b>${truth?'Yes':'No'}</b>（自動）  candidates ${state.oppCandidates.sizeBefore}→${state.oppCandidates.size}`);
+    const next = new Set();
+    for(const x of state.oppCandidates){ if(!!PREDICATES[state.lastQuestion](x)===truth) next.add(x); }
+    state.oppCandidates = next;
+    state.qEvaluated = true;
+    log(`→ <b>${truth?'Yes':'No'}</b>（自動） candidates ${before}→${state.oppCandidates.size}`);
+    renderLists();
   }
 
   const ai = state.pendingAI, pl = state.pendingPL;
@@ -387,7 +414,8 @@ function cleanup(){
   // このタイミングで初めて available を縮める（リーク防止）
   const used = [state.pendingAI, state.pendingPL];
   for(const u of used){ if(state.available.has(u)) state.available.delete(u); }
-  state.pendingAI=null; state.pendingPL=null; state.lastQuestion=null;
+  state.pendingAI=null; state.pendingPL=null;
+  state.lastQuestion=null; state.qEvaluated=false;
   renderGrid(); renderLists();
   setButtons({reveal:false, cleanup:false});
 
@@ -401,7 +429,6 @@ function endGame(){
   const msg = `最終スコア：あなた ${state.score.you} - ${state.score.ai} AI（引分 ${state.score.draw}）`;
   log(`<b>=== 終局 ===</b> ${msg}`);
   statusEl.textContent = msg + "　新しい対局で再開できます。";
-  setButtons({reveal:true, cleanup:true}); // どのみち押しても何もしない
   $("#btnReveal").disabled = true; $("#btnCleanup").disabled = true;
 }
 
