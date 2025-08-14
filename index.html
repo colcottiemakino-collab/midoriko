@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>ハンドレッド / Hundred v2.3.0</title>
+<title>ハンドレッド / Hundred ver 2.3.0</title>
 <style>
   :root{
     --bg:#0e1a12; --bg2:#122216; --panel:#152a1b; --accent:#35c46e; --accent-2:#2aa55b;
@@ -27,7 +27,7 @@
     background:var(--btn); color:var(--text); border:1px solid var(--border);
     border-radius:10px; padding:8px 10px; font-size:14px;
   }
-  input{width:200px}
+  input{width:220px}
   button:hover{background:var(--btn-hover)}
   button:disabled{opacity:.45; cursor:not-allowed}
   .accent{background:var(--accent-2); border-color:transparent; color:#04210f; font-weight:700}
@@ -54,15 +54,18 @@
   .qbar .chosen{outline:2px solid var(--accent)}
   .qline{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:6px}
   .hint{font-size:12px; color:var(--muted)}
+
+  .rules{font-size:12px; color:var(--muted); line-height:1.6}
+  .rules dt{color:var(--text); margin-top:6px}
+  .rules dd{margin:2px 0 6px 0}
 </style>
 </head>
 <body>
 <header>
-  <h1>Hundred / ハンドレッド</h1>
+  <h1>ハンドレッド / Hundred ver 2.3.0</h1>
   <span class="tag">緑テーマ</span>
   <span class="tag">同時公開→判定→削除（リーク防止）</span>
   <span class="tag">奇数優先</span>
-  <span class="tag">v2.2.0</span>
 </header>
 
 <main>
@@ -127,7 +130,7 @@
       <label for="fourSet" class="hint">フォー用（1〜100の数字を最大4つ、空白区切り）</label>
       <input id="fourSet" placeholder="例: 17 33 70 98" disabled />
     </div>
-    <div class="muted">※ あなたが後攻のときのみ選べます。真偽・数値回答はAIの実際の数字から自動判定（嘘はつけません）。</div>
+    <div class="muted">※ 後攻（質問者）のときだけ選べます。選んだら、その場で<b>即回答</b>がログ表示されます。</div>
   </section>
 
   <!-- 中：盤面 -->
@@ -136,7 +139,7 @@
     <div id="grid" class="grid"></div>
     <div class="muted" style="margin-top:6px">
       勝敗判定：<b>奇数は偶数に勝つ</b>。同じ偶奇なら<b>大きい方が勝ち</b>。同値は引分。<br/>
-      ただし、質問が<b>ワン</b>のターンは、<b>質問者が1桁を出し、相手の下1桁と一致</b>なら<b>質問者の勝利</b>。<br/>
+      ただし<b>ワン</b>のターンは、<b>質問者が1桁を出し、相手の下1桁と一致</b>なら<b>質問者勝利</b>（通常判定に優先）。<br/>
       使った数字は「ターン確定（削除）」で初めて盤面から消えます。
     </div>
   </section>
@@ -144,7 +147,7 @@
   <!-- 右：相手情報＆ログ -->
   <section class="card">
     <h2>相手情報</h2>
-    <div class="muted">後攻（質問者）はあなたかAI。AIが質問者のときは自動選択・自動評価。</div>
+    <div class="muted">後攻（質問者）はあなたかAI。AIが質問者のときは自動選択・<b>即時自動回答</b>。</div>
     <div class="sep"></div>
     <div><b>AI未使用（=残り）</b></div>
     <div id="listAI" class="listbox"></div>
@@ -158,18 +161,42 @@
   </section>
 </main>
 
+<section class="card" style="margin:0 16px 16px">
+  <h2>質問ワードの効果（ワン〜ナイン）</h2>
+  <dl class="rules">
+    <dt>ワン</dt>
+    <dd>そのターン限定の特例：質問者が<b>1〜9</b>を出し、相手の<b>下1桁</b>と一致したら質問者の<b>即勝利</b>（通常判定より優先）。</dd>
+    <dt>ツー</dt>
+    <dd>相手の<b>10の位が2の倍数</b>か（Yes/No）。例：20〜29, 40〜49, 60〜69, 80〜89。</dd>
+    <dt>スリー</dt>
+    <dd>相手が<b>3の倍数</b>か（Yes/No）。</dd>
+    <dt>フォー</dt>
+    <dd>あなたが<b>最大4つの数字</b>を指定し、そのいずれかか（Yes/No）。</dd>
+    <dt>ファイブ</dt>
+    <dd>相手の数を<b>5で割った余り</b>（0〜4）を回答。</dd>
+    <dt>シックス</dt>
+    <dd>相手が<b>60未満</b>か（Yes/No）。</dd>
+    <dt>セブン</dt>
+    <dd>相手の表記が<b>“7”を含む</b>か（Yes/No）。例：17, 27, 70〜79, 97。</dd>
+    <dt>エイト</dt>
+    <dd>相手が<b>80〜89</b>か（Yes/No）。</dd>
+    <dt>ナイン</dt>
+    <dd>相手が<b>90以上（100含む）</b>か（Yes/No）。</dd>
+  </dl>
+</section>
+
 <script>
 /* ========= 質問定義 ========= */
 const QDEF = {
-  one:   {type:"rule"},                           // ワン：特例ルール
-  two:   {type:"yn",   fn:x => Math.floor(x/10)%2===0},           // 10の位が2の倍数
-  three: {type:"yn",   fn:x => x%3===0},                          // 3の倍数
-  four:  {type:"four"},                             // 4つ集合 ∋ x ?
-  five:  {type:"mod5"},                             // x mod 5 ∈ {0..4}
-  six:   {type:"yn",   fn:x => x<60},                          // 60未満
-  seven: {type:"yn",   fn:x => String(x).includes("7")},        // 7を含む
-  eight: {type:"yn",   fn:x => Math.floor(x/10)===8},           // 80-89
-  nine:  {type:"yn",   fn:x => x>=90}                           // 90以上
+  one:   {type:"rule"},                                      // ワン：特例（判定時に処理）
+  two:   {type:"yn",   fn:x => Math.floor(x/10)%2===0},      // 10の位が2の倍数
+  three: {type:"yn",   fn:x => x%3===0},                     // 3の倍数
+  four:  {type:"four"},                                      // 4つ集合
+  five:  {type:"mod5"},                                      // x mod 5
+  six:   {type:"yn",   fn:x => x<60},                        // 60未満
+  seven: {type:"yn",   fn:x => String(x).includes("7")},     // “7”を含む
+  eight: {type:"yn",   fn:x => Math.floor(x/10)===8},        // 80-89
+  nine:  {type:"yn",   fn:x => x>=90}                        // 90以上
 };
 const QLABEL = {
   one:"ワン", two:"ツー", three:"スリー", four:"フォー", five:"ファイブ",
@@ -202,7 +229,7 @@ const state = {
 const $ = sel => document.querySelector(sel);
 const gridEl = $("#grid"), logEl = $("#log"), statusEl = $("#status");
 const listAI=$("#listAI"), listOpp=$("#listOpp"), oppCount=$("#oppCount");
-const sYou=$("#sYou"), sAI=$("#sAI"), sD=$("#sD"), turnNow=$("#turnNow"), turnMax=$("#turnMax"), turnStarter=$("#turnStarter"), askerEl=$("#asker");
+const sYou=$("#sYou"), sAI=$("#sAI"), sD=$("#sD"), turnNow=$("#turnNow"), turnMax=$("#turnMax"), turnStarterLabel=$("#turnStarter"), askerEl=$("#asker");
 const fourInput=$("#fourSet");
 
 /* ========= 便利 ========= */
@@ -244,7 +271,7 @@ function setQuestionUIEnabled(enabled){
 }
 function syncRevealButton(){
   const numbersReady = (state.pendingPL!=null && state.pendingAI!=null);
-  const qReady = !!state.qKey; // 後攻側は必ず質問キーが必要
+  const qReady = !!state.qKey; // 後攻は質問必須
   $("#btnReveal").disabled = !(numbersReady && qReady);
 }
 
@@ -259,36 +286,30 @@ function resetGame(){
   const starterSel = $("#starter").value;
   state.turnStarter = (starterSel==="random") ? (Math.random()<0.5?"player":"ai") : starterSel;
   state.asker = (state.turnStarter==="player") ? "ai" : "player";
-  $("#turnMax").textContent = state.roundsMax.toString();
-  $("#turnNow").textContent = "0";
-  $("#turnStarter").textContent = (state.turnStarter==="player") ? "あなた" : "AI";
-  $("#asker").textContent = (state.asker==="player") ? "あなた" : "AI";
-  state.difficulty = $("#difficulty").value;
-
+  turnMax.textContent = state.roundsMax.toString();
+  turnNow.textContent = "0";
   logEl.innerHTML="";
-  statusEl.textContent = "対局開始。後攻が質問者。奇数優先、同偶奇は大きい方。";
+  statusEl.textContent = "対局開始。後攻が質問者。質問は即回答。奇数優先、同偶奇は大きい方。";
   renderGrid(); renderLists(); updateScore();
   setButtons({reveal:false, cleanup:false});
   setQuestionUIEnabled(state.asker==="player");
-
   nextTurn();
 }
 
-/* ========= 難易度別AI選択（奇数優先＋定石） ========= */
+/* ========= AIの戦術（奇数優先＋定石） ========= */
 function tacticSleepless(avail){
   const arr=[...avail];
   const prio = arr.filter(x=> x%2===1 && x%3===0 && x>=69);
   if(prio.length) return Math.max(...prio);
   const odd = arr.filter(x=> x%2===1);
   if(odd.length) return Math.max(...odd);
-  // 奇数枯渇 → 最小偶数で被害最小
   const ev = arr.filter(x=>x%2===0).sort((a,b)=>a-b);
   return ev.length? ev[0] : Math.max(...arr);
 }
 function tactic90Decoy(avail){
   for(const k of ALL_DECOYS){ if(avail.has(k)) return k; }
   const arr = [...avail].sort((a,b)=>a-b);
-  for(const x of arr){ if(x%2===0) return x; } // 偶数は基本負け→捨て石
+  for(const x of arr){ if(x%2===0) return x; }
   for(const x of arr){ if(x%2===1) return x; }
   return arr[0];
 }
@@ -321,19 +342,79 @@ function aiPickNumber(){
   return choice;
 }
 
-/* ========= 質問選択（UI） ========= */
+/* ========= 質問の即時回答ロジック ========= */
+function evaluateQuestionImmediately(){
+  if(!state.qKey) return;
+  const def = QDEF[state.qKey];
+
+  // 評価対象の数字：質問者は後攻なので、
+  // - 質問者がAIなら target = プレイヤーの数字
+  // - 質問者がプレイヤーなら target = AIの数字
+  const target = (state.asker==="ai") ? state.pendingPL : state.pendingAI;
+  if(target==null) return; // まだ相手の数字が未確定 → 後で再度呼ばれる
+
+  if(def.type==="rule"){
+    log(`→ ルール変更（ワン）適用可否は公開時に判定（質問者が1桁＆下1桁一致）。`);
+    state.qEvaluated = true;
+    return;
+  }
+  if(def.type==="yn"){
+    const truth = !!def.fn(target);
+    if(state.asker==="ai"){
+      // AIが質問者：あなた候補を絞る
+      const before = state.oppCandidates.size;
+      const next=new Set(); for(const x of state.oppCandidates){ if(!!def.fn(x)===truth) next.add(x); }
+      state.oppCandidates=next; renderLists();
+      log(`<b>AIの質問: ${QLABEL[state.qKey]}</b> → <b>${truth?'Yes':'No'}</b>（即時） candidates ${before}→${state.oppCandidates.size}`);
+    }else{
+      log(`<b>あなたの質問: ${QLABEL[state.qKey]}</b> → <b>${truth?'Yes':'No'}</b>（即時・AIの数字）`);
+    }
+    state.qEvaluated = true;
+    return;
+  }
+  if(def.type==="four"){
+    const set=new Set(state.qFourSet);
+    const truth = set.has(target);
+    if(state.asker==="ai"){
+      const before = state.oppCandidates.size;
+      const next=new Set(); for(const x of state.oppCandidates){ if(set.has(x)===truth) next.add(x); }
+      state.oppCandidates=next; renderLists();
+      log(`<b>AIの質問: フォー</b> [${state.qFourSet.join(", ")}] → <b>${truth?'Yes':'No'}</b>（即時） candidates ${before}→${state.oppCandidates.size}`);
+    }else{
+      log(`<b>あなたの質問: フォー</b> [${state.qFourSet.join(", ")}] → <b>${truth?'Yes':'No'}</b>（即時・AIの数字）`);
+    }
+    state.qEvaluated = true;
+    return;
+  }
+  if(def.type==="mod5"){
+    const r = (target%5+5)%5;
+    if(state.asker==="ai"){
+      const before = state.oppCandidates.size;
+      const next=new Set(); for(const x of state.oppCandidates){ if(((x%5+5)%5)===r) next.add(x); }
+      state.oppCandidates=next; renderLists();
+      log(`<b>AIの質問: ファイブ</b> → <b>余り ${r}</b>（即時） candidates ${before}→${state.oppCandidates.size}`);
+    }else{
+      log(`<b>あなたの質問: ファイブ</b> → <b>余り ${r}</b>（即時・AIの数字）`);
+    }
+    state.qEvaluated = true;
+    return;
+  }
+}
+
+/* ========= 質問UI（あなたが後攻のとき） ========= */
 document.querySelectorAll(".qbtn").forEach(btn=>{
   btn.addEventListener("click", ()=>{
     if(state.asker!=="player") return;
     document.querySelectorAll(".qbtn").forEach(b=>b.classList.remove("chosen"));
     btn.classList.add("chosen");
     state.qKey = btn.dataset.q;
-    state.qBy = "player";
     state.qEvaluated = false;
-    // フォーのときは入力を活性化
+    // フォー入力の有効化
     fourInput.disabled = (state.qKey!=="four");
     if(state.qKey!=="four"){ state.qFourSet=[]; fourInput.value=""; }
     log(`<b>あなたの質問</b>: ${QLABEL[state.qKey]}`);
+    // もしAIの数字が既に決まっていれば、その場で即時回答
+    evaluateQuestionImmediately();
     syncRevealButton();
   });
 });
@@ -342,35 +423,35 @@ fourInput.addEventListener("change", ()=>{
   state.qFourSet = [...new Set(vals)].slice(0,4);
   fourInput.value = state.qFourSet.join(" ");
   log(`<span class="hint">フォー集合: [${state.qFourSet.join(", ")}]</span>`);
+  // セット内容が変わったら、もう一度即時評価（AI数字が決まっていれば）
+  evaluateQuestionImmediately();
   syncRevealButton();
 });
 
-/* ========= AIが質問者のときの自動選択 ========= */
+/* ========= AIが質問者のときの自動選択（即回答） ========= */
 function aiChooseQuestion(){
-  // 簡易ヒューリスティック：候補の分割が効く順に優先。たまに“五”や“四”を混ぜる。
-  const cand = [];
-  const tryKey = (k)=>{ cand.push(k); };
+  // 簡易：分割効く順＋たまにfive/four
+  const order = [];
   const rnd=Math.random();
-  if(rnd<0.15) tryKey("five");
-  else if(rnd<0.3) tryKey("four");
-  tryKey("two"); tryKey("three"); tryKey("six"); tryKey("seven"); tryKey("eight"); tryKey("nine"); tryKey("one");
-
-  for(const k of cand){
+  if(rnd<0.15) order.push("five");
+  else if(rnd<0.3) order.push("four");
+  order.push("two","three","six","seven","eight","nine","one");
+  // four の候補は分位点から作る
+  for(const k of order){
+    state.qKey = k;
     if(k==="four"){
-      // oppCandidates の四分位近辺を4点選ぶ
       const arr = numArrayDesc(state.oppCandidates).sort((a,b)=>a-b);
-      const picks=[]; const pts=[0.2,0.4,0.6,0.8];
+      const picks=[], pts=[0.2,0.4,0.6,0.8];
       for(const p of pts){ const idx=Math.min(arr.length-1, Math.max(0, Math.floor(arr.length*p))); picks.push(arr[idx]); }
-      state.qFourSet = [...new Set(picks)].slice(0,4);
-      if(state.qFourSet.length<1) continue;
-      state.qKey="four"; state.qBy="ai"; state.qEvaluated=false;
-      log(`<b>AIの質問</b>: フォー（候補: ${state.qFourSet.join(", ")})`);
-      return;
+      state.qFourSet=[...new Set(picks)].slice(0,4);
+      if(!state.qFourSet.length) continue;
+      log(`<b>AIの質問</b>: フォー（候補: ${state.qFourSet.join(", ")}）`);
     }else{
-      state.qKey=k; state.qBy="ai"; state.qEvaluated=false;
       log(`<b>AIの質問</b>: ${QLABEL[k]}`);
-      return;
     }
+    // もしプレイヤーの数字が既に決まっていたら、その場で即時回答
+    evaluateQuestionImmediately();
+    return;
   }
 }
 
@@ -378,9 +459,9 @@ function aiChooseQuestion(){
 function nextTurn(){
   if(state.turn>=state.roundsMax){ endGame(); return; }
   state.turn += 1;
-  $("#turnNow").textContent = String(state.turn);
+  turnNow.textContent = String(state.turn);
 
-  // 交互に先手・後攻を切替
+  // 交互に先手・後攻
   if(state.turn===1){
     const starterSel=$("#starter").value;
     state.turnStarter = (starterSel==="random") ? (Math.random()<0.5?"player":"ai") : starterSel;
@@ -388,109 +469,53 @@ function nextTurn(){
     state.turnStarter = (state.turnStarter==="player") ? "ai" : "player";
   }
   state.asker = (state.turnStarter==="player") ? "ai" : "player";
-  $("#turnStarter").textContent = (state.turnStarter==="player") ? "あなた" : "AI";
-  $("#asker").textContent = (state.asker==="player") ? "あなた" : "AI";
+  turnStarterLabel.textContent = (state.turnStarter==="player") ? "あなた" : "AI";
+  askerEl.textContent = (state.asker==="player") ? "あなた" : "AI";
 
   // ターン初期化
   state.pendingAI=null; state.pendingPL=null;
-  state.qBy=null; state.qKey=null; state.qEvaluated=false; state.qFourSet=[];
+  state.qKey=null; state.qEvaluated=false; state.qFourSet=[];
   setQuestionUIEnabled(state.asker==="player");
   setButtons({reveal:false, cleanup:false});
   Array.from(gridEl.children).forEach(c=>c.classList.remove("selected"));
 
   if(state.turnStarter==="player"){
-    statusEl.textContent = "あなたが先手。AIが後攻＝質問者なので、あなたが選ぶとAIが質問を自動で決めます。";
+    statusEl.textContent = "あなたが先手。AIが後攻＝質問者。あなたが数字を選ぶと、AIが質問を決め、即回答が出ます。";
   }else{
-    statusEl.textContent = "AIが先手（あなたが後攻＝質問者）。まずAIが黙って数字を決めます。あなたは質問を選んでから数字を選んでOK。";
+    statusEl.textContent = "AIが先手（あなたが後攻＝質問者）。AIは黙って数字を決めます。あなたは質問を選べば即回答が出ます。";
     state.pendingAI = aiPickNumber();
   }
 
   renderGrid(); renderLists();
 }
 
-/* あなたが数字を選んだら進行 */
+/* あなたが数字を選んだとき */
 function onPlayerPickedMaybeAdvance(){
   if(state.pendingPL==null){ syncRevealButton(); return; }
 
   if(state.turnStarter==="player"){
-    // 先手はあなた → AIが質問者。あなたが選んだらAIが質問を選ぶ。
-    if(!state.qKey){ aiChooseQuestion(); }
-    // AIも黙って数字を決める
+    // 先手はあなた → AIが質問者：AIが質問を決め、即回答
+    if(!state.qKey) aiChooseQuestion();
+    evaluateQuestionImmediately(); // あなたの数字で即回答
     if(state.pendingAI==null) state.pendingAI = aiPickNumber();
   }else{
-    // 先手はAI → あなたが質問者。質問を選んでいないなら公開できない。
+    // 先手はAI → あなたが質問者：質問を選んでいれば回答済みのはず
   }
   syncRevealButton();
 }
 
-/* ========= 公開→評価→判定→削除 ========= */
-function evaluateQuestionAutomatically(){
-  if(!state.qKey) return;
-  const def = QDEF[state.qKey];
-  if(def.type==="rule"){
-    // ワン：数値判定はなし。判定時に特例を適用。
-    log(`→ ルール変更（ワン）適用：質問者が1桁かつ下1桁一致なら質問者勝利`);
-    state.qEvaluated=true; return;
-  }
-  if(def.type==="yn"){
-    // Yes/No：評価対象は「質問者が相手の数字で判定」
-    const target = (state.qBy==="ai") ? state.pendingPL : state.pendingAI;
-    const truth = !!def.fn(target);
-    if(state.qBy==="ai"){
-      // AIはあなた候補を更新
-      const before = state.oppCandidates.size;
-      const next=new Set();
-      for(const x of state.oppCandidates){ if(!!def.fn(x)===truth) next.add(x); }
-      state.oppCandidates=next; renderLists();
-      log(`→ <b>${truth?'Yes':'No'}</b>（自動） candidates ${before}→${state.oppCandidates.size}`);
-    }else{
-      log(`→ <b>${truth?'Yes':'No'}</b>（自動・AIの数字）`);
-    }
-    state.qEvaluated=true; return;
-  }
-  if(def.type==="four"){
-    const set=new Set(state.qFourSet);
-    const target = (state.qBy==="ai") ? state.pendingPL : state.pendingAI;
-    const truth = set.has(target);
-    if(state.qBy==="ai"){
-      const before = state.oppCandidates.size;
-      const next=new Set();
-      for(const x of state.oppCandidates){ if(set.has(x)===truth) next.add(x); }
-      state.oppCandidates=next; renderLists();
-      log(`→ <b>${truth?'Yes':'No'}</b>（フォー: [${state.qFourSet.join(", ")}]） candidates ${before}→${state.oppCandidates.size}`);
-    }else{
-      log(`→ <b>${truth?'Yes':'No'}</b>（フォー: [${state.qFourSet.join(", ")}], AIの数字）`);
-    }
-    state.qEvaluated=true; return;
-  }
-  if(def.type==="mod5"){
-    const target = (state.qBy==="ai") ? state.pendingPL : state.pendingAI;
-    const r = (target%5+5)%5;
-    if(state.qBy==="ai"){
-      // 形式上は数値回答。候補絞りは r と一致する要素のみ。
-      const before = state.oppCandidates.size;
-      const next=new Set();
-      for(const x of state.oppCandidates){ if(((x%5+5)%5)===r) next.add(x); }
-      state.oppCandidates=next; renderLists();
-      log(`→ <b>余り ${r}</b>（自動） candidates ${before}→${state.oppCandidates.size}`);
-    }else{
-      log(`→ <b>余り ${r}</b>（自動・AIの数字）`);
-    }
-    state.qEvaluated=true; return;
-  }
-}
-
+/* ========= 公開→判定→削除 ========= */
 function revealAndJudge(){
   if(state.pendingPL==null || state.pendingAI==null){ alert("両者の数字が未確定です。"); return; }
   if(!state.qKey){ alert("質問を選んでください。（質問者は後攻です）"); return; }
 
-  // 未評価ならここで自動評価
-  if(!state.qEvaluated) evaluateQuestionAutomatically();
+  // 念のため、まだ回答が出ていなければここで出す（通常は即時に済んでいる）
+  if(!state.qEvaluated) evaluateQuestionImmediately();
 
   const ai = state.pendingAI, pl = state.pendingPL;
   let res="Draw";
 
-  // まずワン特例（ルール変更）を適用
+  // ワン特例（質問者の即勝ち条件）
   if(state.qKey==="one"){
     const askerIsPlayer = (state.asker==="player");
     const askerNum = askerIsPlayer ? pl : ai;
@@ -498,7 +523,6 @@ function revealAndJudge(){
     if(askerNum>=1 && askerNum<=9 && (askerNum%10)===(otherNum%10)){
       res = askerIsPlayer ? "Player" : "AI";
     }else{
-      // 特例が適用されない場合は通常判定へフォールバック
       res = judgeByOddPriority(pl, ai);
     }
   }else{
@@ -523,10 +547,9 @@ function judgeByOddPriority(pl, ai){
 }
 
 function cleanup(){
-  // このタイミングで初めて available を縮める（リーク防止）
   for(const u of [state.pendingAI, state.pendingPL]){ if(state.available.has(u)) state.available.delete(u); }
   state.pendingAI=null; state.pendingPL=null;
-  state.qBy=null; state.qKey=null; state.qEvaluated=false; state.qFourSet=[];
+  state.qKey=null; state.qEvaluated=false; state.qFourSet=[];
   renderGrid(); renderLists();
   setButtons({reveal:false, cleanup:false});
 
