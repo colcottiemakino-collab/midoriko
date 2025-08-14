@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>ハンドレッド / Hundred ver 2.5.1</title>
+<title>ハンドレッド / Hundred ver 2.5.2</title>
 <style>
   :root{
     --bg:#0e1a12; --bg2:#122216; --panel:#152a1b; --accent:#35c46e; --accent-2:#2aa55b;
@@ -63,7 +63,7 @@
 </head>
 <body>
 <header>
-  <h1>ハンドレッド / Hundred ver 2.5.1</h1>
+  <h1>ハンドレッド / Hundred ver 2.5.2</h1>
   <span class="tag">緑テーマ</span>
   <span class="tag">同時公開→判定→自動削除（リーク防止）</span>
   <span class="tag">奇数優先＋3の倍数小勝ち</span>
@@ -234,6 +234,7 @@ const state = {
 
   qKey:null, qLocked:false, qEvaluated:false,
   qFourSet:[],
+  qAsker:null,                 // ★ 追加：この質問の“質問者”を固定保存
 
   revealed:false,
   history: {player:[], ai:[]}
@@ -293,6 +294,7 @@ function resetGame(){
   state.pendingAI=null; state.pendingPL=null;
   state.score={you:0, ai:0, draw:0}; state.lastTactic="normal";
   state.turn=0; state.qKey=null; state.qLocked=false; state.qEvaluated=false; state.qFourSet=[];
+  state.qAsker=null;
   state.revealed=false; state.deuce=false; state.history={player:[], ai:[]};
 
   state.winTarget = parseInt($("#targetWins").value,10);
@@ -301,6 +303,7 @@ function resetGame(){
   const starterSel = $("#starter").value;
   state.turnStarter = (starterSel==="random") ? (Math.random()<0.5?"player":"ai") : starterSel;
   state.asker = (state.turnStarter==="player") ? "ai" : "player";
+  state.qAsker = null;
 
   turnNow.textContent = "0";
   logEl.innerHTML="";
@@ -380,11 +383,18 @@ function aiPickNumber(){
   return choice;
 }
 
-/* ========= 即時回答（表示は簡素化） ========= */
+/* ========= 即時回答（qAskerで対象固定） ========= */
 function evaluateQuestionImmediately(){
   if(!state.qKey || state.qEvaluated) return;
+
+  // 質問者はこの質問の“固定値”を参照
+  const asker = state.qAsker;
+  if(!asker) return; // まだセットされていない（安全）
+
   const def = QDEF[state.qKey];
-  const target = (state.asker==="ai") ? state.pendingPL : state.pendingAI;
+  const target = (asker==="ai") ? state.pendingPL : state.pendingAI; // ★ 固定化
+
+  // 対象未確定なら評価保留
   if(target==null) return;
 
   if(def.type==="rule"){
@@ -394,7 +404,7 @@ function evaluateQuestionImmediately(){
   }
   if(def.type==="yn"){
     const truth = !!def.fn(target);
-    if(state.asker==="ai"){
+    if(asker==="ai"){
       const next=new Set(); for(const x of state.oppCandidates){ if(!!def.fn(x)===truth) next.add(x); }
       state.oppCandidates=next; renderLists();
       log(`<b>AIの質問: ${QLABEL[state.qKey]}</b> → <b>${truth?'Yes':'No'}</b>`);
@@ -407,7 +417,7 @@ function evaluateQuestionImmediately(){
   if(def.type==="four"){
     const set=new Set(state.qFourSet);
     const truth = set.has(target);
-    if(state.asker==="ai"){
+    if(asker==="ai"){
       const next=new Set(); for(const x of state.oppCandidates){ if(set.has(x)===truth) next.add(x); }
       state.oppCandidates=next; renderLists();
       log(`<b>AIの質問: フォー</b> [${state.qFourSet.join(", ")}] → <b>${truth?'Yes':'No'}</b>`);
@@ -419,7 +429,7 @@ function evaluateQuestionImmediately(){
   }
   if(def.type==="mod5"){
     const r = (target%5+5)%5;
-    if(state.asker==="ai"){
+    if(asker==="ai"){
       const next=new Set(); for(const x of state.oppCandidates){ if(((x%5+5)%5)===r) next.add(x); }
       state.oppCandidates=next; renderLists();
       log(`<b>AIの質問: ファイブ</b> → <b>余り ${r}</b>`);
@@ -438,10 +448,11 @@ document.querySelectorAll(".qbtn").forEach(btn=>{
     document.querySelectorAll(".qbtn").forEach(b=>b.classList.remove("chosen"));
     btn.classList.add("chosen");
     state.qKey = btn.dataset.q;
+    state.qAsker = "player";            // ★ 固定
     fourInput.disabled = (state.qKey!=="four");
     if(state.qKey!=="four"){ state.qFourSet=[]; fourInput.value=""; }
     log(`<b>あなたの質問</b>: ${QLABEL[state.qKey]}（このターンはロック）`);
-    evaluateQuestionImmediately();
+    evaluateQuestionImmediately();      // 対象が決まっていれば即評価
     syncRevealButton();
   });
 });
@@ -455,7 +466,7 @@ fourInput.addEventListener("change", ()=>{
   syncRevealButton();
 });
 
-/* ========= フォー空打ち防止ヘルパー（★ 追加） ========= */
+/* ========= フォー空打ち防止ヘルパー ========= */
 function buildFourSetFromCandidates(candSet){
   const arr = Array.from(candSet).sort((a,b)=>a-b);
   if(arr.length===0) return [];
@@ -469,7 +480,7 @@ function buildFourSetFromCandidates(candSet){
   return [...new Set(picks.filter(Number.isInteger))].slice(0,4);
 }
 
-/* ========= AIの質問選択（フォー空打ち防止の最小パッチ） ========= */
+/* ========= AIの質問選択（qAsker固定＋空打ち防止） ========= */
 function aiChooseQuestion(){
   if(state.qLocked) return;
   const order = [];
@@ -480,20 +491,22 @@ function aiChooseQuestion(){
 
   for(const k of order){
     state.qKey = k;
+    state.qAsker = "ai";               // ★ 固定
     if(k==="four"){
-      const fourSet = buildFourSetFromCandidates(state.oppCandidates); // ★ ここで安全生成
-      if(fourSet.length===0){ continue; } // ★ 空ならスキップ（ログも出さない）
+      const fourSet = buildFourSetFromCandidates(state.oppCandidates);
+      if(fourSet.length===0){ continue; }
       state.qFourSet = fourSet;
       log(`<b>AIの質問</b>: フォー（候補: ${state.qFourSet.join(", ")})`);
     }else{
       log(`<b>AIの質問</b>: ${QLABEL[k]}`);
     }
-    evaluateQuestionImmediately();
+    evaluateQuestionImmediately();     // 対象が決まっていれば即評価
     return;
   }
 
   // 念のためのフォールバック
   state.qKey = "three";
+  state.qAsker = "ai";
   log(`<b>AIの質問</b>: ${QLABEL[state.qKey]}`);
   evaluateQuestionImmediately();
 }
@@ -511,6 +524,7 @@ function nextTurn(){
     state.turnStarter = (state.turnStarter==="player") ? "ai" : "player";
   }
   state.asker = (state.turnStarter==="player") ? "ai" : "player";
+  state.qAsker = null; // ★ 新ターンでリセット
   turnStarterLabel.textContent = (state.turnStarter==="player") ? "あなた" : "AI";
   askerEl.textContent = (state.asker==="player") ? "あなた" : "AI";
 
@@ -528,8 +542,9 @@ function nextTurn(){
     statusEl.textContent = `対局開始。先取本数は ${state.winTarget}。`;
   }
   if(state.turnStarter==="player"){
-    // あなた先手
+    // プレイヤー先手：AIは質問者
   }else{
+    // AI先手：AIの手は先に確定させる
     state.pendingAI = aiPickNumber();
   }
 
@@ -540,11 +555,12 @@ function nextTurn(){
 function onPlayerPickedMaybeAdvance(){
   if(state.pendingPL==null){ syncRevealButton(); return; }
   if(state.turnStarter==="player"){
-    if(!state.qKey) aiChooseQuestion();
-    evaluateQuestionImmediately();
+    if(!state.qKey) aiChooseQuestion();   // ここで qAsker="ai" が固定される
+    evaluateQuestionImmediately();         // あなたの数が決まっているので即評価可能
     if(state.pendingAI==null) state.pendingAI = aiPickNumber();
   }else{
-    evaluateQuestionImmediately();
+    // AI先手（あなた後攻＝質問者）
+    evaluateQuestionImmediately();         // qAsker が player の場合、AIの数が決まっていれば即評価
   }
   syncRevealButton();
 }
@@ -562,7 +578,7 @@ function revealAndJudge(){
 
   // ①ワン特例
   if(state.qKey==="one"){
-    const askerIsPlayer = (state.asker==="player");
+    const askerIsPlayer = (state.qAsker==="player"); // ★ 固定化した質問者を使う
     const askerNum = askerIsPlayer ? pl : ai;
     const otherNum = askerIsPlayer ? ai : pl;
     if(askerNum>=1 && askerNum<=9 && (askerNum%10)===(otherNum%10)){
@@ -592,14 +608,14 @@ function revealAndJudge(){
 /* ★★★ 通常判定：②奇数＞偶数 → ③3の倍数同士は小さい方 → ④その他は大きい方 ★★★ */
 function judgeCore(pl, ai){
   const aiOdd=(ai%2===1), plOdd=(pl%2===1);
-  if(aiOdd!==plOdd){ return plOdd ? "Player" : "AI"; }          // ②奇数偶数
+  if(aiOdd!==plOdd){ return plOdd ? "Player" : "AI"; }
   const aiM3=(ai%3===0), plM3=(pl%3===0);
-  if(aiM3 && plM3){                                             // ③3の倍数同士
+  if(aiM3 && plM3){
     if(pl<ai) return "Player";
     if(pl>ai) return "AI";
     return "Draw";
   }
-  if(pl>ai) return "Player";                                    // ④大小
+  if(pl>ai) return "Player";
   if(pl<ai) return "AI";
   return "Draw";
 }
@@ -640,6 +656,7 @@ function cleanup(){
 
   state.pendingAI=null; state.pendingPL=null;
   state.qKey=null; state.qLocked=false; state.qEvaluated=false; state.qFourSet=[];
+  state.qAsker=null;
   renderGrid(); renderLists();
   setButtons({reveal:false, cleanup:false});
   gridEl.classList.remove("disabled");
