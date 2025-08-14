@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>ハンドレッド / Hundred ver 2.4.3</title>
+<title>ハンドレッド / Hundred ver 2.5.0</title>
 <style>
   :root{
     --bg:#0e1a12; --bg2:#122216; --panel:#152a1b; --accent:#35c46e; --accent-2:#2aa55b;
@@ -63,12 +63,11 @@
 </head>
 <body>
 <header>
-  <h1>ハンドレッド / Hundred ver 2.4.3</h1>
+  <h1>ハンドレッド / Hundred ver 2.5.0</h1>
   <span class="tag">緑テーマ</span>
   <span class="tag">同時公開→判定→自動削除（リーク防止）</span>
-  <span class="tag">奇数優先</span>
-  <span class="tag">3の倍数ルール</span>
-  <span class="tag">デュースあり</span>
+  <span class="tag">奇数優先＋3の倍数小勝ち</span>
+  <span class="tag">先取本数＋デュース（Win by 2）</span>
 </header>
 
 <main>
@@ -83,10 +82,10 @@
         <option value="hard">hard</option>
       </select>
 
-      <label>ラウンド数</label>
-      <select id="rounds">
-        <option value="5">5</option>
-        <option value="9" selected>9</option>
+      <label>先取本数</label>
+      <select id="targetWins">
+        <option value="5" selected>5</option>
+        <option value="9">9</option>
         <option value="13">13</option>
       </select>
     </div>
@@ -105,10 +104,10 @@
 
     <h2>ターン</h2>
     <div class="row" style="margin-bottom:8px">
-      <div>現在：<span id="turnNow">-</span> / 合計：<span id="turnMax">-</span>　先手：<span id="turnStarter">-</span>　質問者：<span id="asker">-</span></div>
+      <div>ターン：<span id="turnNow">-</span>　先手：<span id="turnStarter">-</span>　質問者：<span id="asker">-</span></div>
     </div>
     <div class="row" style="margin-bottom:8px">
-      <div>スコア：あなた <span id="sYou">0</span> - <span id="sAI">0</span> AI　（引分 <span id="sD">0</span>）</div>
+      <div>スコア（先取 <span id="winTargetLabel">5</span>）：あなた <span id="sYou">0</span> - <span id="sAI">0</span> AI　（引分 <span id="sD">0</span>）</div>
     </div>
     <div class="row">
       <button id="btnReveal" disabled class="accent">同時公開 → 判定</button>
@@ -143,7 +142,8 @@
     <div class="muted" style="margin-top:6px">
       勝敗判定の優先順：<b>①ワン特例 → ②奇数は偶数に勝つ → ③3の倍数同士は小さい方が勝つ → ④それ以外は大きい方が勝つ</b>。同値は引分。<br/>
       使った数字は公開→判定の直後に<b>自動で削除</b>され、同じ数字は二度と使えません。<br/>
-      ※ 数字の山は<b>共用ではなく個別</b>です。AIが使った数字でも、あなたの山からは消えません。
+      ※ 数字の山は<b>共用ではなく個別</b>です。AIが使った数字でも、あなたの山からは消えません。<br/>
+      ※ 勝負は<b>先取本数方式</b>。リードが<b>1点差</b>のままでは決着せず、<b>両者が先取本数に到達（例：5-5）するとデュース（Win by 2）</b>になります。
     </div>
   </section>
 
@@ -186,7 +186,7 @@
     <dt>ナイン</dt>
     <dd>相手が<b>90以上（100含む）</b>か（Yes/No）。</dd>
   </dl>
-  <div class="muted"><b>デュース（延長）あり：</b>規定ラウンド終了時にスコアが同点なら、<b>サドンデス</b>で1ラウンドずつ延長し、<b>同点でない結果</b>になった時点で試合終了。</div>
+  <div class="muted"><b>デュース（Win by 2）：</b>両者が先取本数に到達したら（例：5-5）、以後は<b>2点差がつくまで</b>延長します。</div>
 </section>
 
 <script>
@@ -215,10 +215,13 @@ const ALL_DECOYS = [...STRONG_DECOYS, ...NEXT_DECOYS];
 /* ========= 状態 ========= */
 const state = {
   difficulty: "normal",
-  roundsMax: 9,
   turn: 0,
   turnStarter: "player",
   asker: "ai",
+
+  // 先取本数
+  winTarget: 5,
+  deuce: false,
 
   availablePL: new Set(),
   availableAI: new Set(),
@@ -233,14 +236,13 @@ const state = {
   qFourSet:[],
 
   revealed:false,
-  deuce:false,
   history: {player:[], ai:[]}
 };
 
 const $ = sel => document.querySelector(sel);
 const gridEl = $("#grid"), logEl = $("#log"), statusEl = $("#status");
 const listAI=$("#listAI"), listOpp=$("#listOpp"), oppCount=$("#oppCount");
-const sYou=$("#sYou"), sAI=$("#sAI"), sD=$("#sD"), turnNow=$("#turnNow"), turnMax=$("#turnMax"), turnStarterLabel=$("#turnStarter"), askerEl=$("#asker");
+const sYou=$("#sYou"), sAI=$("#sAI"), sD=$("#sD"), turnNow=$("#turnNow"), winTargetLabel=$("#winTargetLabel"), turnStarterLabel=$("#turnStarter"), askerEl=$("#asker");
 const fourInput=$("#fourSet");
 
 /* ========= 便利 ========= */
@@ -292,14 +294,17 @@ function resetGame(){
   state.score={you:0, ai:0, draw:0}; state.lastTactic="normal";
   state.turn=0; state.qKey=null; state.qLocked=false; state.qEvaluated=false; state.qFourSet=[];
   state.revealed=false; state.deuce=false; state.history={player:[], ai:[]};
-  state.roundsMax = parseInt($("#rounds").value,10);
+
+  state.winTarget = parseInt($("#targetWins").value,10);
+  winTargetLabel.textContent = String(state.winTarget);
+
   const starterSel = $("#starter").value;
   state.turnStarter = (starterSel==="random") ? (Math.random()<0.5?"player":"ai") : starterSel;
   state.asker = (state.turnStarter==="player") ? "ai" : "player";
-  turnMax.textContent = state.roundsMax.toString();
+
   turnNow.textContent = "0";
   logEl.innerHTML="";
-  statusEl.textContent = "対局開始。後攻は質問者。質問は即回答。山は個別。規定ラウンド同点ならデュース。";
+  statusEl.textContent = "対局開始。先取本数方式。両者が先取に到達するとデュース（Win by 2）。";
   renderGrid(); renderLists(); updateScore();
   setButtons({reveal:false, cleanup:false});
   setQuestionUIEnabled(state.asker==="player");
@@ -501,9 +506,9 @@ function nextTurn(){
   Array.from(gridEl.children).forEach(c=>c.classList.remove("selected"));
 
   if(state.deuce){
-    statusEl.textContent = "デュース（延長）中：サドンデスで延長しています。";
+    statusEl.textContent = "デュース中（Win by 2）。";
   }else if(state.turn===1){
-    statusEl.textContent = "対局開始。規定ラウンド同点ならデュースへ。";
+    statusEl.textContent = `対局開始。先取本数は ${state.winTarget}。`;
   }
   if(state.turnStarter==="player"){
     // あなた先手
@@ -538,7 +543,7 @@ function revealAndJudge(){
   const ai = state.pendingAI, pl = state.pendingPL;
   let res="Draw";
 
-  // ①ワン特例（質問者の即勝ち条件）
+  // ①ワン特例
   if(state.qKey==="one"){
     const askerIsPlayer = (state.asker==="player");
     const askerNum = askerIsPlayer ? pl : ai;
@@ -546,7 +551,7 @@ function revealAndJudge(){
     if(askerNum>=1 && askerNum<=9 && (askerNum%10)===(otherNum%10)){
       res = askerIsPlayer ? "Player" : "AI";
     }else{
-      res = judgeCore(pl, ai);  // 通常判定へ
+      res = judgeCore(pl, ai);
     }
   }else{
     res = judgeCore(pl, ai);
@@ -562,7 +567,7 @@ function revealAndJudge(){
   state.revealed = true;
   gridEl.classList.add("disabled");
   setButtons({reveal:false, cleanup:true});
-  statusEl.textContent = state.deuce ? "延長ラウンド判定。数字は自動で削除されます。" : "判定完了。数字は自動で削除されます。";
+  statusEl.textContent = "判定完了。数字は自動で削除されます。";
 
   cleanup(true);
 }
@@ -570,42 +575,52 @@ function revealAndJudge(){
 /* ★★★ 通常判定：②奇数＞偶数 → ③3の倍数同士は小さい方 → ④その他は大きい方 ★★★ */
 function judgeCore(pl, ai){
   const aiOdd=(ai%2===1), plOdd=(pl%2===1);
-  // ② 奇数偶数ルール
-  if(aiOdd!==plOdd){ return plOdd ? "Player" : "AI"; }
-
-  // ③ 3の倍数ルール（双方が3の倍数のときだけ適用）
-  const aiM3 = (ai%3===0), plM3 = (pl%3===0);
-  if(aiM3 && plM3){
+  if(aiOdd!==plOdd){ return plOdd ? "Player" : "AI"; }          // ②奇数偶数
+  const aiM3=(ai%3===0), plM3=(pl%3===0);
+  if(aiM3 && plM3){                                             // ③3の倍数同士
     if(pl<ai) return "Player";
     if(pl>ai) return "AI";
     return "Draw";
   }
-
-  // ④ それ以外は数値の大小
-  if(pl>ai) return "Player";
+  if(pl>ai) return "Player";                                    // ④大小
   if(pl<ai) return "AI";
   return "Draw";
 }
 
-function maybeEnterDeuceOrEnd(){
-  const finishedRegular = state.turn >= state.roundsMax;
-  if(!finishedRegular) return false;
+/* ========= 先取本数＋デュースの終了判定 ========= */
+function maybeFinishByTarget(){
+  const Y=state.score.you, A=state.score.ai, T=state.winTarget;
 
-  if(state.score.you === state.score.ai){
-    if(!state.deuce){
+  // デュースに入っていない段階
+  if(!state.deuce){
+    // 両者が T に到達 → デュース突入
+    if(Y>=T && A>=T){
       state.deuce = true;
-      log(`<b>=== デュース突入（延長） ===</b>`);
+      log(`<b>=== デュース突入（Win by 2） ===</b>`);
+      return false; // 継続
     }
-    state.roundsMax += 1;
-    turnMax.textContent = String(state.roundsMax);
-    return false; // 続行
-  }else{
+    // 片方が T に到達でも、1点差なら継続（5-4など）
+    if((Y>=T || A>=T) && Math.abs(Y-A)===1){
+      return false; // 継続
+    }
+    // 片方が T に到達かつ 2点差以上 → 決着（例：6-4 など）
+    if((Y>=T || A>=T) && Math.abs(Y-A)>=2){
+      endGame();
+      return true;
+    }
+    // まだ T 未満 → 継続
+    return false;
+  }
+
+  // デュース中：2点差がついたら終了
+  if(Math.abs(Y-A)>=2){
     endGame();
     return true;
   }
+  return false; // 継続
 }
 
-function cleanup(auto=false){
+function cleanup(){
   if(state.pendingPL!=null && state.availablePL.has(state.pendingPL)) state.availablePL.delete(state.pendingPL);
   if(state.pendingAI!=null && state.availableAI.has(state.pendingAI)) state.availableAI.delete(state.pendingAI);
 
@@ -618,25 +633,25 @@ function cleanup(auto=false){
   setButtons({reveal:false, cleanup:false});
   gridEl.classList.remove("disabled");
 
-  if(!maybeEnterDeuceOrEnd()){
+  // ★ 先取＋デュースの終了判定
+  if(!maybeFinishByTarget()){
     nextTurn();
   }
 }
 
 function endGame(){
-  const msg = `最終スコア：あなた ${state.score.you} - ${state.score.ai} AI（引分 ${state.score.draw}）`;
-  statusEl.textContent = msg + (state.deuce ? "（延長の末）" : "") + "　新しい対局で再開できます。";
-  log(`<b>=== 終局 ===</b> ${msg}${state.deuce ? "（延長の末）" : ""}`);
+  const msg = `最終スコア：あなた ${state.score.you} - ${state.score.ai} AI`;
+  statusEl.textContent = msg + (state.deuce ? "（デュースの末）" : "") + "　新しい対局で再開できます。";
+  log(`<b>=== 終局 ===</b> ${msg}${state.deuce ? "（デュースの末）" : ""}`);
   $("#btnReveal").disabled = true; $("#btnCleanup").disabled = true;
 }
 
 /* ========= イベント ========= */
 $("#btnReveal").addEventListener("click", ()=>{ revealAndJudge(); });
-$("#btnCleanup").addEventListener("click", ()=>{ cleanup(true); });
+$("#btnCleanup").addEventListener("click", ()=>{ cleanup(); });
 $("#btnNew").addEventListener("click", ()=>{ resetGame(); });
 
 /* 初期起動 */
-turnMax.textContent = "-";
 resetGame();
 </script>
 </body>
