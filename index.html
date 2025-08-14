@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>ハンドレッド / Hundred ver 2.5.0</title>
+<title>ハンドレッド / Hundred ver 2.5.1</title>
 <style>
   :root{
     --bg:#0e1a12; --bg2:#122216; --panel:#152a1b; --accent:#35c46e; --accent-2:#2aa55b;
@@ -63,7 +63,7 @@
 </head>
 <body>
 <header>
-  <h1>ハンドレッド / Hundred ver 2.5.0</h1>
+  <h1>ハンドレッド / Hundred ver 2.5.1</h1>
   <span class="tag">緑テーマ</span>
   <span class="tag">同時公開→判定→自動削除（リーク防止）</span>
   <span class="tag">奇数優先＋3の倍数小勝ち</span>
@@ -455,7 +455,21 @@ fourInput.addEventListener("change", ()=>{
   syncRevealButton();
 });
 
-/* ========= AIの質問選択 ========= */
+/* ========= フォー空打ち防止ヘルパー（★ 追加） ========= */
+function buildFourSetFromCandidates(candSet){
+  const arr = Array.from(candSet).sort((a,b)=>a-b);
+  if(arr.length===0) return [];
+  const picks = [];
+  const pts = [0.2, 0.4, 0.6, 0.8];
+  for(const p of pts){
+    const idx = Math.max(0, Math.min(arr.length-1, Math.floor(arr.length*p)));
+    const v = arr[idx];
+    if (Number.isInteger(v)) picks.push(v);
+  }
+  return [...new Set(picks.filter(Number.isInteger))].slice(0,4);
+}
+
+/* ========= AIの質問選択（フォー空打ち防止の最小パッチ） ========= */
 function aiChooseQuestion(){
   if(state.qLocked) return;
   const order = [];
@@ -467,18 +481,21 @@ function aiChooseQuestion(){
   for(const k of order){
     state.qKey = k;
     if(k==="four"){
-      const arr = numArrayDesc(state.oppCandidates).sort((a,b)=>a-b);
-      const picks=[], pts=[0.2,0.4,0.6,0.8];
-      for(const p of pts){ const idx=Math.min(arr.length-1, Math.max(0, Math.floor(arr.length*p))); picks.push(arr[idx]); }
-      state.qFourSet=[...new Set(picks)].slice(0,4);
-      if(!state.qFourSet.length) continue;
-      log(`<b>AIの質問</b>: フォー（候補: ${state.qFourSet.join(", ")}）`);
+      const fourSet = buildFourSetFromCandidates(state.oppCandidates); // ★ ここで安全生成
+      if(fourSet.length===0){ continue; } // ★ 空ならスキップ（ログも出さない）
+      state.qFourSet = fourSet;
+      log(`<b>AIの質問</b>: フォー（候補: ${state.qFourSet.join(", ")})`);
     }else{
       log(`<b>AIの質問</b>: ${QLABEL[k]}`);
     }
     evaluateQuestionImmediately();
     return;
   }
+
+  // 念のためのフォールバック
+  state.qKey = "three";
+  log(`<b>AIの質問</b>: ${QLABEL[state.qKey]}`);
+  evaluateQuestionImmediately();
 }
 
 /* ========= ターン制御 ========= */
@@ -591,33 +608,27 @@ function judgeCore(pl, ai){
 function maybeFinishByTarget(){
   const Y=state.score.you, A=state.score.ai, T=state.winTarget;
 
-  // デュースに入っていない段階
   if(!state.deuce){
-    // 両者が T に到達 → デュース突入
     if(Y>=T && A>=T){
       state.deuce = true;
       log(`<b>=== デュース突入（Win by 2） ===</b>`);
-      return false; // 継続
+      return false;
     }
-    // 片方が T に到達でも、1点差なら継続（5-4など）
     if((Y>=T || A>=T) && Math.abs(Y-A)===1){
-      return false; // 継続
+      return false;
     }
-    // 片方が T に到達かつ 2点差以上 → 決着（例：6-4 など）
     if((Y>=T || A>=T) && Math.abs(Y-A)>=2){
       endGame();
       return true;
     }
-    // まだ T 未満 → 継続
     return false;
   }
 
-  // デュース中：2点差がついたら終了
   if(Math.abs(Y-A)>=2){
     endGame();
     return true;
   }
-  return false; // 継続
+  return false;
 }
 
 function cleanup(){
@@ -633,7 +644,6 @@ function cleanup(){
   setButtons({reveal:false, cleanup:false});
   gridEl.classList.remove("disabled");
 
-  // ★ 先取＋デュースの終了判定
   if(!maybeFinishByTarget()){
     nextTurn();
   }
