@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>ハンドレッド / Hundred ver 2.3.0</title>
+<title>ハンドレッド / Hundred ver 2.4.0</title>
 <style>
   :root{
     --bg:#0e1a12; --bg2:#122216; --panel:#152a1b; --accent:#35c46e; --accent-2:#2aa55b;
@@ -43,6 +43,7 @@
   .cell:hover{transform:translateY(-1px); background:#184029}
   .cell.used{background:var(--grid-used); color:#6e8a78; border-style:dashed; cursor:not-allowed}
   .cell.selected{outline:2px solid var(--accent); box-shadow:0 0 0 2px rgba(53,196,110,.25) inset}
+  .disabled{pointer-events:none; opacity:.6}
 
   .log{max-height:320px; overflow:auto; font-family:ui-monospace,Consolas,monospace; font-size:12px; line-height:1.5}
   .log b{color:var(--good)}
@@ -62,9 +63,9 @@
 </head>
 <body>
 <header>
-  <h1>ハンドレッド / Hundred ver 2.3.0</h1>
+  <h1>ハンドレッド / Hundred ver 2.4.0</h1>
   <span class="tag">緑テーマ</span>
-  <span class="tag">同時公開→判定→削除（リーク防止）</span>
+  <span class="tag">同時公開→判定→自動削除（リーク防止）</span>
   <span class="tag">奇数優先</span>
 </header>
 
@@ -109,7 +110,7 @@
     </div>
     <div class="row">
       <button id="btnReveal" disabled class="accent">同時公開 → 判定</button>
-      <button id="btnCleanup" disabled>ターン確定（削除）</button>
+      <button id="btnCleanup" disabled>（自動削除中）</button>
     </div>
 
     <div class="sep"></div>
@@ -130,7 +131,7 @@
       <label for="fourSet" class="hint">フォー用（1〜100の数字を最大4つ、空白区切り）</label>
       <input id="fourSet" placeholder="例: 17 33 70 98" disabled />
     </div>
-    <div class="muted">※ 後攻（質問者）のときだけ選べます。選んだら、その場で<b>即回答</b>がログ表示されます。</div>
+    <div class="muted">※ 後攻（質問者）のときだけ選べます。選んだら<b>即回答</b>がログ表示。<b>このターンは1回のみ</b>選択可能。</div>
   </section>
 
   <!-- 中：盤面 -->
@@ -139,8 +140,8 @@
     <div id="grid" class="grid"></div>
     <div class="muted" style="margin-top:6px">
       勝敗判定：<b>奇数は偶数に勝つ</b>。同じ偶奇なら<b>大きい方が勝ち</b>。同値は引分。<br/>
-      ただし<b>ワン</b>のターンは、<b>質問者が1桁を出し、相手の下1桁と一致</b>なら<b>質問者勝利</b>（通常判定に優先）。<br/>
-      使った数字は「ターン確定（削除）」で初めて盤面から消えます。
+      ただし<b>ワン</b>のターンは、<b>質問者が1桁を出し、相手の下1桁と一致</b>なら<b>質問者勝利</b>（通常判定より優先）。<br/>
+      公開→判定の直後に<b>自動で削除</b>され、同じ数字は二度と使えません。
     </div>
   </section>
 
@@ -222,8 +223,11 @@ const state = {
   score: {you:0, ai:0, draw:0},
   lastTactic: "normal",
   // 質問
-  qBy:null, qKey:null, qEvaluated:false,
-  qFourSet:[], // フォー用
+  qKey:null, qLocked:false, qEvaluated:false,
+  qFourSet:[],
+  // 進行
+  revealed:false,
+  history: {player:[], ai:[]}
 };
 
 const $ = sel => document.querySelector(sel);
@@ -250,6 +254,7 @@ function renderGrid(){
       cell.classList.add("used");
     }else{
       cell.addEventListener("click", ()=>{
+        if(state.revealed) return; // 公開後は操作不可
         state.pendingPL = (state.pendingPL===n ? null : n);
         Array.from(gridEl.children).forEach(c=>c.classList.remove("selected"));
         if(state.pendingPL===n) cell.classList.add("selected");
@@ -262,17 +267,13 @@ function renderGrid(){
 function updateScore(){ sYou.textContent=state.score.you; sAI.textContent=state.score.ai; sD.textContent=state.score.draw; }
 function setButtons({reveal, cleanup}){ $("#btnReveal").disabled=!reveal; $("#btnCleanup").disabled=!cleanup; }
 function setQuestionUIEnabled(enabled){
-  document.querySelectorAll(".qbtn").forEach(b=>b.disabled=!enabled);
-  fourInput.disabled = !enabled;
-  if(!enabled){
-    document.querySelectorAll(".qbtn").forEach(b=>b.classList.remove("chosen"));
-    fourInput.value=""; state.qFourSet=[];
-  }
+  document.querySelectorAll(".qbtn").forEach(b=>b.disabled=!enabled || state.qLocked);
+  fourInput.disabled = !enabled || state.qLocked || state.qKey!=="four";
 }
 function syncRevealButton(){
   const numbersReady = (state.pendingPL!=null && state.pendingAI!=null);
   const qReady = !!state.qKey; // 後攻は質問必須
-  $("#btnReveal").disabled = !(numbersReady && qReady);
+  $("#btnReveal").disabled = !(numbersReady && qReady) || state.revealed;
 }
 
 /* ========= 初期化 ========= */
@@ -281,7 +282,8 @@ function resetGame(){
   state.oppCandidates = new Set(Array.from({length:100},(_,i)=>i+1));
   state.pendingAI=null; state.pendingPL=null;
   state.score={you:0, ai:0, draw:0}; state.lastTactic="normal";
-  state.turn=0; state.qBy=null; state.qKey=null; state.qEvaluated=false; state.qFourSet=[];
+  state.turn=0; state.qKey=null; state.qLocked=false; state.qEvaluated=false; state.qFourSet=[];
+  state.revealed=false; state.history={player:[], ai:[]};
   state.roundsMax = parseInt($("#rounds").value,10);
   const starterSel = $("#starter").value;
   state.turnStarter = (starterSel==="random") ? (Math.random()<0.5?"player":"ai") : starterSel;
@@ -289,14 +291,34 @@ function resetGame(){
   turnMax.textContent = state.roundsMax.toString();
   turnNow.textContent = "0";
   logEl.innerHTML="";
-  statusEl.textContent = "対局開始。後攻が質問者。質問は即回答。奇数優先、同偶奇は大きい方。";
+  statusEl.textContent = "対局開始。後攻は質問者。質問は即回答、各ターン1回のみ。奇数優先、同偶奇は大きい方。";
   renderGrid(); renderLists(); updateScore();
   setButtons({reveal:false, cleanup:false});
   setQuestionUIEnabled(state.asker==="player");
   nextTurn();
 }
 
-/* ========= AIの戦術（奇数優先＋定石） ========= */
+/* ========= スリープレス圧の検知 & 偶数抜け ========= */
+function isSleeplessPressure(){
+  // 直近のあなたの手が「高い奇数」「3刻み（>=69の3の倍数±1帯）」に寄っていると圧とみなす
+  const p = state.history.player;
+  if(p.length===0) return false;
+  const last = p[p.length-1];
+  if(last%2===1 && last>=85) return true;                 // 高奇数
+  if(last>=69 && (last%3===0 || (last-1)%3===0 || (last+1)%3===0)) return true; // 3刻付近
+  return false;
+}
+function pickEvenEscape(avail){
+  // 偶数抜け定石：3の倍数の偶数を優先（96, 84, 78, 72, 66, 60, 90, 48...）
+  const wishlist = [96, 84, 78, 72, 66, 60, 90, 48, 36, 30];
+  for(const k of wishlist){ if(avail.has(k)) return k; }
+  const arr=[...avail].sort((a,b)=>a-b);
+  for(const x of arr){ if(x%2===0 && x%3===0) return x; } // 任意の偶数3倍数
+  for(const x of arr){ if(x%2===0) return x; }            // それも無ければ最小偶数
+  return arr[0];
+}
+
+/* ========= AIの戦術（奇数優先＋定石＋Hardで偶数抜け） ========= */
 function tacticSleepless(avail){
   const arr=[...avail];
   const prio = arr.filter(x=> x%2===1 && x%3===0 && x>=69);
@@ -326,6 +348,14 @@ function tacticNormal(avail){
 }
 function aiPickNumber(){
   const diff = $("#difficulty").value;
+  // Hard：相手からスリープレス圧を感じたら偶数抜けでカウンター
+  if(diff==="hard" && isSleeplessPressure()){
+    const choice = pickEvenEscape(state.available);
+    state.lastTactic = "even-escape";
+    return choice;
+  }
+
+  // 通常の選択（Hardは強戦術を連発可／他はたまに）
   let useSleepless=false, useDecoy=false;
   if(diff==="hard"){
     const r=Math.random();
@@ -342,17 +372,13 @@ function aiPickNumber(){
   return choice;
 }
 
-/* ========= 質問の即時回答ロジック ========= */
+/* ========= 即時回答（各ターン1回のみ） ========= */
 function evaluateQuestionImmediately(){
-  if(!state.qKey) return;
-  const def = QDEF[state.qKey];
-
-  // 評価対象の数字：質問者は後攻なので、
-  // - 質問者がAIなら target = プレイヤーの数字
-  // - 質問者がプレイヤーなら target = AIの数字
+  if(!state.qKey || state.qEvaluated) return;
   const target = (state.asker==="ai") ? state.pendingPL : state.pendingAI;
-  if(target==null) return; // まだ相手の数字が未確定 → 後で再度呼ばれる
+  if(target==null) return;
 
+  const def = QDEF[state.qKey];
   if(def.type==="rule"){
     log(`→ ルール変更（ワン）適用可否は公開時に判定（質問者が1桁＆下1桁一致）。`);
     state.qEvaluated = true;
@@ -361,7 +387,6 @@ function evaluateQuestionImmediately(){
   if(def.type==="yn"){
     const truth = !!def.fn(target);
     if(state.asker==="ai"){
-      // AIが質問者：あなた候補を絞る
       const before = state.oppCandidates.size;
       const next=new Set(); for(const x of state.oppCandidates){ if(!!def.fn(x)===truth) next.add(x); }
       state.oppCandidates=next; renderLists();
@@ -369,7 +394,7 @@ function evaluateQuestionImmediately(){
     }else{
       log(`<b>あなたの質問: ${QLABEL[state.qKey]}</b> → <b>${truth?'Yes':'No'}</b>（即時・AIの数字）`);
     }
-    state.qEvaluated = true;
+    state.qEvaluated = true; state.qLocked = true; setQuestionUIEnabled(state.asker==="player");
     return;
   }
   if(def.type==="four"){
@@ -383,7 +408,7 @@ function evaluateQuestionImmediately(){
     }else{
       log(`<b>あなたの質問: フォー</b> [${state.qFourSet.join(", ")}] → <b>${truth?'Yes':'No'}</b>（即時・AIの数字）`);
     }
-    state.qEvaluated = true;
+    state.qEvaluated = true; state.qLocked = true; setQuestionUIEnabled(state.asker==="player");
     return;
   }
   if(def.type==="mod5"){
@@ -396,47 +421,45 @@ function evaluateQuestionImmediately(){
     }else{
       log(`<b>あなたの質問: ファイブ</b> → <b>余り ${r}</b>（即時・AIの数字）`);
     }
-    state.qEvaluated = true;
+    state.qEvaluated = true; state.qLocked = true; setQuestionUIEnabled(state.asker==="player");
     return;
   }
 }
 
-/* ========= 質問UI（あなたが後攻のとき） ========= */
+/* ========= 質問UI（あなたが後攻のとき1回だけ） ========= */
 document.querySelectorAll(".qbtn").forEach(btn=>{
   btn.addEventListener("click", ()=>{
-    if(state.asker!=="player") return;
+    if(state.asker!=="player" || state.qLocked || state.revealed) return;
     document.querySelectorAll(".qbtn").forEach(b=>b.classList.remove("chosen"));
     btn.classList.add("chosen");
     state.qKey = btn.dataset.q;
-    state.qEvaluated = false;
     // フォー入力の有効化
     fourInput.disabled = (state.qKey!=="four");
     if(state.qKey!=="four"){ state.qFourSet=[]; fourInput.value=""; }
-    log(`<b>あなたの質問</b>: ${QLABEL[state.qKey]}`);
-    // もしAIの数字が既に決まっていれば、その場で即時回答
-    evaluateQuestionImmediately();
+    log(`<b>あなたの質問</b>: ${QLABEL[state.qKey]}（このターンはロック）`);
+    evaluateQuestionImmediately(); // AIの数字が決まっていれば即時回答
     syncRevealButton();
   });
 });
 fourInput.addEventListener("change", ()=>{
+  if(state.qLocked) return;
   const vals = fourInput.value.trim().split(/\s+/).filter(s=>s.length>0).map(s=>parseInt(s,10)).filter(n=>Number.isInteger(n)&&n>=1&&n<=100);
   state.qFourSet = [...new Set(vals)].slice(0,4);
   fourInput.value = state.qFourSet.join(" ");
   log(`<span class="hint">フォー集合: [${state.qFourSet.join(", ")}]</span>`);
-  // セット内容が変わったら、もう一度即時評価（AI数字が決まっていれば）
   evaluateQuestionImmediately();
   syncRevealButton();
 });
 
-/* ========= AIが質問者のときの自動選択（即回答） ========= */
+/* ========= AI質問（即選択・即回答） ========= */
 function aiChooseQuestion(){
-  // 簡易：分割効く順＋たまにfive/four
+  if(state.qLocked) return;
   const order = [];
   const rnd=Math.random();
   if(rnd<0.15) order.push("five");
   else if(rnd<0.3) order.push("four");
   order.push("two","three","six","seven","eight","nine","one");
-  // four の候補は分位点から作る
+
   for(const k of order){
     state.qKey = k;
     if(k==="four"){
@@ -449,8 +472,7 @@ function aiChooseQuestion(){
     }else{
       log(`<b>AIの質問</b>: ${QLABEL[k]}`);
     }
-    // もしプレイヤーの数字が既に決まっていたら、その場で即時回答
-    evaluateQuestionImmediately();
+    evaluateQuestionImmediately(); // プレイヤー数字が決まっていれば即時回答
     return;
   }
 }
@@ -474,7 +496,8 @@ function nextTurn(){
 
   // ターン初期化
   state.pendingAI=null; state.pendingPL=null;
-  state.qKey=null; state.qEvaluated=false; state.qFourSet=[];
+  state.qKey=null; state.qLocked=false; state.qEvaluated=false; state.qFourSet=[];
+  state.revealed=false;
   setQuestionUIEnabled(state.asker==="player");
   setButtons({reveal:false, cleanup:false});
   Array.from(gridEl.children).forEach(c=>c.classList.remove("selected"));
@@ -482,7 +505,7 @@ function nextTurn(){
   if(state.turnStarter==="player"){
     statusEl.textContent = "あなたが先手。AIが後攻＝質問者。あなたが数字を選ぶと、AIが質問を決め、即回答が出ます。";
   }else{
-    statusEl.textContent = "AIが先手（あなたが後攻＝質問者）。AIは黙って数字を決めます。あなたは質問を選べば即回答が出ます。";
+    statusEl.textContent = "AIが先手（あなたが後攻＝質問者）。AIは黙って数字を決めます。あなたが質問を選ぶと即回答が出ます。";
     state.pendingAI = aiPickNumber();
   }
 
@@ -492,25 +515,26 @@ function nextTurn(){
 /* あなたが数字を選んだとき */
 function onPlayerPickedMaybeAdvance(){
   if(state.pendingPL==null){ syncRevealButton(); return; }
-
   if(state.turnStarter==="player"){
-    // 先手はあなた → AIが質問者：AIが質問を決め、即回答
-    if(!state.qKey) aiChooseQuestion();
-    evaluateQuestionImmediately(); // あなたの数字で即回答
+    if(!state.qKey) aiChooseQuestion();      // AIが質問を決める
+    evaluateQuestionImmediately();           // あなたの数字で即回答
     if(state.pendingAI==null) state.pendingAI = aiPickNumber();
   }else{
-    // 先手はAI → あなたが質問者：質問を選んでいれば回答済みのはず
+    // あなたが質問者：質問を選んでいれば回答済みのはず
+    evaluateQuestionImmediately();           // 念のため
   }
   syncRevealButton();
 }
 
-/* ========= 公開→判定→削除 ========= */
+/* ========= 公開→判定→自動削除 ========= */
 function revealAndJudge(){
+  if(state.revealed) return;
   if(state.pendingPL==null || state.pendingAI==null){ alert("両者の数字が未確定です。"); return; }
   if(!state.qKey){ alert("質問を選んでください。（質問者は後攻です）"); return; }
 
-  // 念のため、まだ回答が出ていなければここで出す（通常は即時に済んでいる）
+  // 未回答ならここで回答し、以降このターンは質問ロック
   if(!state.qEvaluated) evaluateQuestionImmediately();
+  state.qLocked = true; setQuestionUIEnabled(state.asker==="player");
 
   const ai = state.pendingAI, pl = state.pendingPL;
   let res="Draw";
@@ -533,10 +557,18 @@ function revealAndJudge(){
   else if(res==="AI") state.score.ai++;
   else state.score.draw++;
 
+  // ログ & スコア
   log(`<b>[公開]</b> AI=${ai} / You=${pl} → <b>${res}</b>`);
-  statusEl.textContent = "判定完了。続いて「ターン確定（削除）」で盤面を更新します。";
   updateScore();
+
+  // このターンは公開済みにして、入力を一旦無効化
+  state.revealed = true;
+  gridEl.classList.add("disabled");
   setButtons({reveal:false, cleanup:true});
+  statusEl.textContent = "判定完了。数字は自動で削除されます。";
+
+  // 自動削除 → 次ターン
+  cleanup(true);
 }
 function judgeByOddPriority(pl, ai){
   const aiOdd=(ai%2===1), plOdd=(pl%2===1);
@@ -546,12 +578,18 @@ function judgeByOddPriority(pl, ai){
   return "Draw";
 }
 
-function cleanup(){
+function cleanup(auto=false){
+  // 使用済み数字を削除（ここで初めて消す＝リーク防止）
   for(const u of [state.pendingAI, state.pendingPL]){ if(state.available.has(u)) state.available.delete(u); }
+  // 履歴に記録
+  if(state.pendingAI!=null) state.history.ai.push(state.pendingAI);
+  if(state.pendingPL!=null) state.history.player.push(state.pendingPL);
+
   state.pendingAI=null; state.pendingPL=null;
-  state.qKey=null; state.qEvaluated=false; state.qFourSet=[];
+  state.qKey=null; state.qLocked=false; state.qEvaluated=false; state.qFourSet=[];
   renderGrid(); renderLists();
   setButtons({reveal:false, cleanup:false});
+  gridEl.classList.remove("disabled");
 
   if(state.turn>=state.roundsMax){ endGame(); }
   else { nextTurn(); }
@@ -566,7 +604,7 @@ function endGame(){
 
 /* ========= イベント ========= */
 $("#btnReveal").addEventListener("click", ()=>{ revealAndJudge(); });
-$("#btnCleanup").addEventListener("click", ()=>{ cleanup(); });
+$("#btnCleanup").addEventListener("click", ()=>{ /* 手動押下でも即処理 */ cleanup(true); });
 $("#btnNew").addEventListener("click", ()=>{ resetGame(); });
 
 /* 初期起動 */
