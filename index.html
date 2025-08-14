@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>ハンドレッド / Hundred ver 2.4.1</title>
+<title>ハンドレッド / Hundred ver 2.4.2</title>
 <style>
   :root{
     --bg:#0e1a12; --bg2:#122216; --panel:#152a1b; --accent:#35c46e; --accent-2:#2aa55b;
@@ -63,10 +63,11 @@
 </head>
 <body>
 <header>
-  <h1>ハンドレッド / Hundred ver 2.4.1</h1>
+  <h1>ハンドレッド / Hundred ver 2.4.2</h1>
   <span class="tag">緑テーマ</span>
   <span class="tag">同時公開→判定→自動削除（リーク防止）</span>
   <span class="tag">奇数優先</span>
+  <span class="tag">デュースあり</span>
 </header>
 
 <main>
@@ -185,27 +186,28 @@
     <dt>ナイン</dt>
     <dd>相手が<b>90以上（100含む）</b>か（Yes/No）。</dd>
   </dl>
+  <div class="muted"><b>デュース（延長）あり：</b>規定ラウンド終了時にスコアが同点なら、<b>サドンデス</b>で1ラウンドずつ延長し、<b>同点でない結果</b>になった時点で試合終了。</div>
 </section>
 
 <script>
 /* ========= 質問定義 ========= */
 const QDEF = {
-  one:   {type:"rule"},                                      // ワン：特例（判定時に処理）
-  two:   {type:"yn",   fn:x => Math.floor(x/10)%2===0},      // 10の位が2の倍数
-  three: {type:"yn",   fn:x => x%3===0},                     // 3の倍数
-  four:  {type:"four"},                                      // 4つ集合
-  five:  {type:"mod5"},                                      // x mod 5
-  six:   {type:"yn",   fn:x => x<60},                        // 60未満
-  seven: {type:"yn",   fn:x => String(x).includes("7")},     // “7”を含む
-  eight: {type:"yn",   fn:x => Math.floor(x/10)===8},        // 80-89
-  nine:  {type:"yn",   fn:x => x>=90}                        // 90以上
+  one:   {type:"rule"},
+  two:   {type:"yn",   fn:x => Math.floor(x/10)%2===0},
+  three: {type:"yn",   fn:x => x%3===0},
+  four:  {type:"four"},
+  five:  {type:"mod5"},
+  six:   {type:"yn",   fn:x => x<60},
+  seven: {type:"yn",   fn:x => String(x).includes("7")},
+  eight: {type:"yn",   fn:x => Math.floor(x/10)===8},
+  nine:  {type:"yn",   fn:x => x>=90}
 };
 const QLABEL = {
   one:"ワン", two:"ツー", three:"スリー", four:"フォー", five:"ファイブ",
   six:"シックス", seven:"セブン", eight:"エイト", nine:"ナイン"
 };
 
-/* ========= デコイ集合（指定） ========= */
+/* ========= デコイ集合 ========= */
 const STRONG_DECOYS = [90, 80, 70, 96, 84, 78, 72];
 const NEXT_DECOYS   = [98, 94, 92, 88, 86, 82, 76, 74];
 const ALL_DECOYS = [...STRONG_DECOYS, ...NEXT_DECOYS];
@@ -216,24 +218,22 @@ const state = {
   roundsMax: 9,
   turn: 0,
   turnStarter: "player",
-  asker: "ai", // 後攻＝質問者
+  asker: "ai",
 
-  // ★ 山を分離：プレイヤー用/AI用（非共用）
   availablePL: new Set(),
   availableAI: new Set(),
 
-  oppCandidates: new Set(), // AIが推定する「あなたの候補」
+  oppCandidates: new Set(),
   pendingAI: null,
   pendingPL: null,
   score: {you:0, ai:0, draw:0},
   lastTactic: "normal",
 
-  // 質問
   qKey:null, qLocked:false, qEvaluated:false,
   qFourSet:[],
 
-  // 進行
   revealed:false,
+  deuce:false,              // ★ 追加：デュース中フラグ
   history: {player:[], ai:[]}
 };
 
@@ -247,10 +247,7 @@ const fourInput=$("#fourSet");
 function log(line){ const div=document.createElement("div"); div.innerHTML=line; logEl.appendChild(div); logEl.scrollTop=logEl.scrollHeight; }
 function numArrayDesc(set){ return Array.from(set).sort((a,b)=>b-a); }
 function renderLists(){
-  // 右の一覧は「AIの未使用」だけを表示
   listAI.textContent = numArrayDesc(state.availableAI).join(", ");
-
-  // AIの推定（あなたの候補）
   const arrOpp = numArrayDesc(state.oppCandidates);
   oppCount.textContent = arrOpp.length;
   listOpp.textContent = arrOpp.slice(0,160).join(", ") + (arrOpp.length>160 ? " ..." : "");
@@ -264,7 +261,7 @@ function renderGrid(){
       cell.classList.add("used");
     }else{
       cell.addEventListener("click", ()=>{
-        if(state.revealed) return; // 公開後は操作不可
+        if(state.revealed) return;
         state.pendingPL = (state.pendingPL===n ? null : n);
         Array.from(gridEl.children).forEach(c=>c.classList.remove("selected"));
         if(state.pendingPL===n) cell.classList.add("selected");
@@ -282,7 +279,7 @@ function setQuestionUIEnabled(enabled){
 }
 function syncRevealButton(){
   const numbersReady = (state.pendingPL!=null && state.pendingAI!=null);
-  const qReady = !!state.qKey; // 後攻は質問必須
+  const qReady = !!state.qKey;
   $("#btnReveal").disabled = !(numbersReady && qReady) || state.revealed;
 }
 
@@ -294,7 +291,7 @@ function resetGame(){
   state.pendingAI=null; state.pendingPL=null;
   state.score={you:0, ai:0, draw:0}; state.lastTactic="normal";
   state.turn=0; state.qKey=null; state.qLocked=false; state.qEvaluated=false; state.qFourSet=[];
-  state.revealed=false; state.history={player:[], ai:[]};
+  state.revealed=false; state.deuce=false; state.history={player:[], ai:[]};
   state.roundsMax = parseInt($("#rounds").value,10);
   const starterSel = $("#starter").value;
   state.turnStarter = (starterSel==="random") ? (Math.random()<0.5?"player":"ai") : starterSel;
@@ -302,7 +299,7 @@ function resetGame(){
   turnMax.textContent = state.roundsMax.toString();
   turnNow.textContent = "0";
   logEl.innerHTML="";
-  statusEl.textContent = "対局開始。後攻は質問者。質問は即回答（表示は簡素化）。山は共用でなく個別。";
+  statusEl.textContent = "対局開始。後攻は質問者。質問は即回答。山は個別。規定ラウンド同点ならデュース。";
   renderGrid(); renderLists(); updateScore();
   setButtons({reveal:false, cleanup:false});
   setQuestionUIEnabled(state.asker==="player");
@@ -327,7 +324,7 @@ function pickEvenEscape(avail){
   return arr[0];
 }
 
-/* ========= AIの戦術（奇数優先＋定石＋Hardで偶数抜け） ========= */
+/* ========= AIの戦術 ========= */
 function tacticSleepless(avail){
   const arr=[...avail];
   const prio = arr.filter(x=> x%2===1 && x%3===0 && x>=69);
@@ -357,13 +354,11 @@ function tacticNormal(avail){
 }
 function aiPickNumber(){
   const diff = $("#difficulty").value;
-  // Hard：相手からスリープレス圧を感じたら偶数抜けでカウンター
   if(diff==="hard" && isSleeplessPressure()){
     const choice = pickEvenEscape(state.availableAI);
     state.lastTactic = "even-escape";
     return choice;
   }
-
   let useSleepless=false, useDecoy=false;
   if(diff==="hard"){
     const r=Math.random();
@@ -380,7 +375,7 @@ function aiPickNumber(){
   return choice;
 }
 
-/* ========= 質問の即時回答（表示は簡素化） ========= */
+/* ========= 即時回答（表示は簡素化） ========= */
 function evaluateQuestionImmediately(){
   if(!state.qKey || state.qEvaluated) return;
   const def = QDEF[state.qKey];
@@ -395,7 +390,6 @@ function evaluateQuestionImmediately(){
   if(def.type==="yn"){
     const truth = !!def.fn(target);
     if(state.asker==="ai"){
-      // 候補絞り（内部）は継続。表示は簡素に。
       const next=new Set(); for(const x of state.oppCandidates){ if(!!def.fn(x)===truth) next.add(x); }
       state.oppCandidates=next; renderLists();
       log(`<b>AIの質問: ${QLABEL[state.qKey]}</b> → <b>${truth?'Yes':'No'}</b>`);
@@ -432,14 +426,13 @@ function evaluateQuestionImmediately(){
   }
 }
 
-/* ========= 質問UI（あなたが後攻のとき1回のみ） ========= */
+/* ========= 質問UI ========= */
 document.querySelectorAll(".qbtn").forEach(btn=>{
   btn.addEventListener("click", ()=>{
     if(state.asker!=="player" || state.qLocked || state.revealed) return;
     document.querySelectorAll(".qbtn").forEach(b=>b.classList.remove("chosen"));
     btn.classList.add("chosen");
     state.qKey = btn.dataset.q;
-    // フォー入力の有効化
     fourInput.disabled = (state.qKey!=="four");
     if(state.qKey!=="four"){ state.qFourSet=[]; fourInput.value=""; }
     log(`<b>あなたの質問</b>: ${QLABEL[state.qKey]}（このターンはロック）`);
@@ -457,7 +450,7 @@ fourInput.addEventListener("change", ()=>{
   syncRevealButton();
 });
 
-/* ========= AI質問（即選択・即回答） ========= */
+/* ========= AIの質問選択 ========= */
 function aiChooseQuestion(){
   if(state.qLocked) return;
   const order = [];
@@ -485,7 +478,7 @@ function aiChooseQuestion(){
 
 /* ========= ターン制御 ========= */
 function nextTurn(){
-  if(state.turn>=state.roundsMax){ endGame(); return; }
+  // デュース中でも turn はインクリメントし、turnMax は「現在の最大ターン数」を表示
   state.turn += 1;
   turnNow.textContent = String(state.turn);
 
@@ -508,10 +501,15 @@ function nextTurn(){
   setButtons({reveal:false, cleanup:false});
   Array.from(gridEl.children).forEach(c=>c.classList.remove("selected"));
 
+  // 先手メッセージ
+  if(state.deuce){
+    statusEl.textContent = "デュース（延長）中：サドンデスで延長しています。";
+  }else if(state.turn===1){
+    statusEl.textContent = "対局開始。規定ラウンド同点ならデュースへ。";
+  }
   if(state.turnStarter==="player"){
-    statusEl.textContent = "あなたが先手。AIが後攻＝質問者。あなたが数字を選ぶと、AIが質問を決め、即回答が出ます。";
+    // あなた先手
   }else{
-    statusEl.textContent = "AIが先手（あなたが後攻＝質問者）。AIは黙って数字を決めます。あなたが質問を選ぶと即回答が出ます。";
     state.pendingAI = aiPickNumber();
   }
 
@@ -522,11 +520,10 @@ function nextTurn(){
 function onPlayerPickedMaybeAdvance(){
   if(state.pendingPL==null){ syncRevealButton(); return; }
   if(state.turnStarter==="player"){
-    if(!state.qKey) aiChooseQuestion();      // AIが質問を決める
-    evaluateQuestionImmediately();           // あなたの数字で即回答
+    if(!state.qKey) aiChooseQuestion();
+    evaluateQuestionImmediately();
     if(state.pendingAI==null) state.pendingAI = aiPickNumber();
   }else{
-    // あなたが質問者：質問を選んでいれば回答済み
     evaluateQuestionImmediately();
   }
   syncRevealButton();
@@ -537,14 +534,12 @@ function revealAndJudge(){
   if(state.revealed) return;
   if(state.pendingPL==null || state.pendingAI==null){ alert("両者の数字が未確定です。"); return; }
   if(!state.qKey){ alert("質問を選んでください。（質問者は後攻です）"); return; }
-
   if(!state.qEvaluated) evaluateQuestionImmediately();
   state.qLocked = true; setQuestionUIEnabled(state.asker==="player");
 
   const ai = state.pendingAI, pl = state.pendingPL;
   let res="Draw";
 
-  // ワン特例（質問者の即勝ち条件）
   if(state.qKey==="one"){
     const askerIsPlayer = (state.asker==="player");
     const askerNum = askerIsPlayer ? pl : ai;
@@ -568,7 +563,7 @@ function revealAndJudge(){
   state.revealed = true;
   gridEl.classList.add("disabled");
   setButtons({reveal:false, cleanup:true});
-  statusEl.textContent = "判定完了。数字は自動で削除されます。";
+  statusEl.textContent = state.deuce ? "延長ラウンド判定。数字は自動で削除されます。" : "判定完了。数字は自動で削除されます。";
 
   cleanup(true);
 }
@@ -580,12 +575,32 @@ function judgeByOddPriority(pl, ai){
   return "Draw";
 }
 
+function maybeEnterDeuceOrEnd(){
+  // 規定ラウンドが終わっているか？
+  const finishedRegular = state.turn >= state.roundsMax;
+  if(!finishedRegular) return false;
+
+  if(state.score.you === state.score.ai){
+    // ★ デュース突入：1ラウンドずつ延長（サドンデス）
+    if(!state.deuce){
+      state.deuce = true;
+      log(`<b>=== デュース突入（延長） ===</b>`);
+    }
+    // 最大ターン数を延長表示（UI上の合計を+1して示す）
+    state.roundsMax += 1;
+    turnMax.textContent = String(state.roundsMax);
+    return false; // 試合は続行
+  }else{
+    // 同点でなければ試合終了
+    endGame();
+    return true;
+  }
+}
+
 function cleanup(auto=false){
-  // 使用済み数字を「それぞれの山」から除去（非共用）
   if(state.pendingPL!=null && state.availablePL.has(state.pendingPL)) state.availablePL.delete(state.pendingPL);
   if(state.pendingAI!=null && state.availableAI.has(state.pendingAI)) state.availableAI.delete(state.pendingAI);
 
-  // 履歴
   if(state.pendingAI!=null) state.history.ai.push(state.pendingAI);
   if(state.pendingPL!=null) state.history.player.push(state.pendingPL);
 
@@ -595,14 +610,16 @@ function cleanup(auto=false){
   setButtons({reveal:false, cleanup:false});
   gridEl.classList.remove("disabled");
 
-  if(state.turn>=state.roundsMax){ endGame(); }
-  else { nextTurn(); }
+  // ★ 規定終了→デュース判定 or 終局
+  if(!maybeEnterDeuceOrEnd()){
+    nextTurn();
+  }
 }
 
 function endGame(){
   const msg = `最終スコア：あなた ${state.score.you} - ${state.score.ai} AI（引分 ${state.score.draw}）`;
   log(`<b>=== 終局 ===</b> ${msg}`);
-  statusEl.textContent = msg + "　新しい対局で再開できます。";
+  statusEl.textContent = msg + (state.deuce ? "（延長の末）" : "") + "　新しい対局で再開できます。";
   $("#btnReveal").disabled = true; $("#btnCleanup").disabled = true;
 }
 
@@ -612,6 +629,7 @@ $("#btnCleanup").addEventListener("click", ()=>{ cleanup(true); });
 $("#btnNew").addEventListener("click", ()=>{ resetGame(); });
 
 /* 初期起動 */
+turnMax.textContent = "-";
 resetGame();
 </script>
 </body>
