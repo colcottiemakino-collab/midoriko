@@ -126,7 +126,7 @@
     <div class="card" style="flex:2">
       <h2>質問（後攻のとき 1回だけ） <span class="muted">(このターン: <span id="questionState">未実行</span>)</span></h2>
       <div class="qs-grid">
-        <label class="qs-item"><input type="radio" name="q" value="1"> 1: ワン — この回に限り、下1桁が一致したら小さい方が勝つ</label>
+        <label class="qs-item"><input type="radio" name="q" value="1"> 1: ワン — この回に限り、こっちの１桁の数が相手の下1桁に一致したら勝つ</label>
         <label class="qs-item"><input type="radio" name="q" value="2"> 2: ツー — 10の位が偶数帯？</label>
         <label class="qs-item"><input type="radio" name="q" value="3"> 3: スリー — 3で割り切れる？</label>
         <label class="qs-item"><input type="radio" name="q" value="4"> 4: フォー — 宣言4つのどれか？ <br>
@@ -186,7 +186,7 @@
          3) 上記以外 → 大きい方の勝ち</div>
     <br>
     <div class="sectionTitle">質問（後攻のみ／毎ラウンド1つ／再使用可）</div>
-    <div>1: ワン … この回に限り、両者の下1桁が一致したら小さい方が勝つ<br>
+    <div>1: ワン … この回に限り、こっちの1桁の数字が相手の下1桁に一致したら勝つ<br>
          2: ツー … 10の位が偶数帯？<br>
          3: スリー … 3で割り切れる？<br>
          4: フォー … 宣言4つのどれか？<br>
@@ -528,5 +528,6 @@ $("#playBtn").addEventListener("click", ()=>{
 </script>
 </body>
 </html>
+
 
 
