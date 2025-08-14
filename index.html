@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>ハンドレッド / Hundred ver 2.6.1</title>
+<title>ハンドレッド / Hundred ver 2.6.2</title>
 <style>
   :root{
     --bg:#0e1a12; --bg2:#122216; --panel:#152a1b; --accent:#35c46e; --accent-2:#2aa55b;
@@ -63,7 +63,7 @@
 </head>
 <body>
 <header>
-  <h1>ハンドレッド / Hundred ver 2.6.1</h1>
+  <h1>ハンドレッド / Hundred ver 2.6.2</h1>
   <span class="tag">緑テーマ</span>
   <span class="tag">同時公開→判定→自動削除（リーク防止）</span>
   <span class="tag">奇数優先＋3の倍数小勝ち</span>
@@ -349,7 +349,7 @@ function tactic90Decoy(avail){
   for(const x of arr){ if(x%2===1) return x; }
   return arr[0];
 }
-/* ★追加：大きめ奇数の威嚇（3の倍数かどうかは不問、非3倍数をやや優先） */
+/* 大きめ奇数の威嚇（3倍数かは不問、非3倍数をやや優先） */
 function tacticOddThreat(avail){
   const odd = [...avail].filter(x=>x%2===1).sort((a,b)=>b-a);
   if(odd.length===0) return Math.max(...avail);
@@ -368,32 +368,34 @@ function tacticNormal(avail){
   return ev.length? ev[0] : Math.max(...arr);
 }
 
-/* ========= AIの出目ロジック（EXPERT対応） ========= */
+/* ========= AIの出目ロジック（EXPERT後手の偶数禁止を厳守） ========= */
 function aiPickNumber(){
   const diff = $("#difficulty").value;
 
-  // ★EXPERT：先行は偶数デコイ主体、25%だけ大きめ奇数で威嚇
+  // EXPERT：先手は偶数デコイ主体、後手は奇数徹底（残り>30までは偶数禁止）
   if(diff==="expert"){
-    const starterIsAI = (state.turnStarter==="ai");
-    if(starterIsAI){
-      if(Math.random()<0.75){
-        state.lastTactic = "decoy";
-        return tactic90Decoy(state.availableAI);
-      }else{
-        state.lastTactic = "odd-threat";
-        return tacticOddThreat(state.availableAI);
-      }
+    const aiIsStarter = (state.turnStarter==="ai");
+    if(aiIsStarter){
+      // AI先手：偶数デコイ主体＋25%で大きめ奇数
+      if(Math.random()<0.75){ state.lastTactic="decoy"; return tactic90Decoy(state.availableAI); }
+      state.lastTactic="odd-threat"; return tacticOddThreat(state.availableAI);
     }else{
-      // 非先行時：90デコイ：奇数威嚇：スリープレスヒント ≒ 0.60：0.25：0.15
-      const r = Math.random();
-      if(r < 0.60){ state.lastTactic="decoy"; return tactic90Decoy(state.availableAI); }
-      if(r < 0.85){ state.lastTactic="odd-threat"; return tacticOddThreat(state.availableAI); }
-      state.lastTactic="sleepless-hint";
-      return tacticNormal(state.availableAI);
+      // AI後手：残りが30超の間は“偶数は原則出さない”
+      const remain = state.availableAI.size;
+      const oddExist = [...state.availableAI].some(x=>x%2===1);
+      if(remain>30 && oddExist){
+        state.lastTactic="odd-threat";
+        return tacticOddThreat(state.availableAI); // 必ず奇数
+      }
+      // ここからは終盤（≤30）or 奇数枯渇 → 混合だが奇数優先
+      const r=Math.random();
+      if(oddExist && r<0.7){ state.lastTactic="odd-threat"; return tacticOddThreat(state.availableAI); }
+      if(r<0.85){ state.lastTactic="decoy"; return tactic90Decoy(state.availableAI); }
+      state.lastTactic="sleepless-hint"; return tacticNormal(state.availableAI);
     }
   }
 
-  // ★Hard（従来維持）：圧を感じたら偶数抜け
+  // Hard（従来）：圧を感じたら偶数抜け
   if(diff==="hard" && isSleeplessPressure()){
     const choice = pickEvenEscape(state.availableAI);
     state.lastTactic = "even-escape";
@@ -514,7 +516,7 @@ function buildFourSetFromCandidates(candSet){
 function aiChooseQuestion(){
   if(state.qLocked) return;
 
-  // ★EXPERT：AIが質問者なら高確率でスリーを選んで継続絞り込み
+  // EXPERT：AIが質問者なら高確率でスリーを選んで継続絞り込み
   if($("#difficulty").value==="expert" && state.asker==="ai"){
     state.qKey = (Math.random() < 0.7) ? "three" : null;
     state.qAsker = "ai";
