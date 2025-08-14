@@ -56,12 +56,14 @@
   .muted{color:var(--muted);}
   .log{
     background:var(--panel); border:1px dashed var(--border); border-radius:10px; padding:10px;
-    height:260px; overflow:auto; font-family: ui-monospace, Menlo, Consolas, monospace; font-size:13px; white-space:pre-wrap;
+    height:260px; overflow:auto; font-family: ui-monospace, Menlo, Consolas, monospace; font-size:13px;
+    white-space:pre-wrap;   /* ← 改行を表示する */
   }
   .hands{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
   .handBox{
     background:#fff; border:1px solid var(--border); border-radius:10px; padding:10px;
     font-family: ui-monospace, Menlo, Consolas, monospace; font-size:13px; height:160px; overflow:auto;
+    white-space:pre-wrap;
   }
   .badge{display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; margin-left:6px;}
   .bad-win{background:#dff3e6; color:var(--win);}
@@ -207,7 +209,11 @@
 <script>
 const $ = sel => document.querySelector(sel);
 const logEl = $("#log");
-function logLine(txt){ logEl.textContent += txt + "\\n"; logEl.scrollTop = logEl.scrollHeight; }
+function logLine(txt){
+  // textContent + pre-wrap で確実に改行を表示（\n がそのまま効く）
+  logEl.textContent += txt + "\\n";
+  logEl.scrollTop = logEl.scrollHeight;
+}
 function blockFormat(arr){
   const sorted = [...arr].sort((a,b)=>a-b);
   let s = "";
@@ -229,7 +235,6 @@ let handYou = [], handAI = [];
 let playerTurnFirst = null;
 let questionUsed = false;     // ① 1ラウンド1回
 let oneUsedThisRound = false; // ワン特例
-let awaitingAnswer = false;   // ② 後攻は質問→数字の順を強制
 let aiFirstSecret = null;     // ③ AI先手の秘密数字（手札から削除済みで保持）
 
 // ===== 判定 =====
@@ -321,7 +326,6 @@ function startRound(){
   round += 1;
   oneUsedThisRound = false;
   questionUsed = false;
-  awaitingAnswer = false;
   $("#round").textContent = `— Round ${round} —`;
   $("#questionState").textContent = "未実行";
   setControlsForTurn();
@@ -436,7 +440,6 @@ $("#askBtn").addEventListener("click", ()=>{
   }
 
   // 後攻は質問後に数字入力を解放
-  awaitingAnswer = true;
   $("#yourNum").disabled = false;
   $("#playBtn").disabled = false;
 });
