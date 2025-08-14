@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>ハンドレッド / Hundred ver 2.4.2</title>
+<title>ハンドレッド / Hundred ver 2.4.3</title>
 <style>
   :root{
     --bg:#0e1a12; --bg2:#122216; --panel:#152a1b; --accent:#35c46e; --accent-2:#2aa55b;
@@ -63,10 +63,11 @@
 </head>
 <body>
 <header>
-  <h1>ハンドレッド / Hundred ver 2.4.2</h1>
+  <h1>ハンドレッド / Hundred ver 2.4.3</h1>
   <span class="tag">緑テーマ</span>
   <span class="tag">同時公開→判定→自動削除（リーク防止）</span>
   <span class="tag">奇数優先</span>
+  <span class="tag">3の倍数ルール</span>
   <span class="tag">デュースあり</span>
 </header>
 
@@ -140,9 +141,8 @@
     <h2>盤面（あなたの未使用の数字）</h2>
     <div id="grid" class="grid"></div>
     <div class="muted" style="margin-top:6px">
-      勝敗判定：<b>奇数は偶数に勝つ</b>。同じ偶奇なら<b>大きい方が勝ち</b>。同値は引分。<br/>
-      ただし<b>ワン</b>のターンは、<b>質問者が1桁を出し、相手の下1桁と一致</b>なら<b>質問者勝利</b>（通常判定より優先）。<br/>
-      公開→判定の直後に<b>自動で削除</b>され、同じ数字は二度と使えません。<br/>
+      勝敗判定の優先順：<b>①ワン特例 → ②奇数は偶数に勝つ → ③3の倍数同士は小さい方が勝つ → ④それ以外は大きい方が勝つ</b>。同値は引分。<br/>
+      使った数字は公開→判定の直後に<b>自動で削除</b>され、同じ数字は二度と使えません。<br/>
       ※ 数字の山は<b>共用ではなく個別</b>です。AIが使った数字でも、あなたの山からは消えません。
     </div>
   </section>
@@ -233,7 +233,7 @@ const state = {
   qFourSet:[],
 
   revealed:false,
-  deuce:false,              // ★ 追加：デュース中フラグ
+  deuce:false,
   history: {player:[], ai:[]}
 };
 
@@ -478,7 +478,6 @@ function aiChooseQuestion(){
 
 /* ========= ターン制御 ========= */
 function nextTurn(){
-  // デュース中でも turn はインクリメントし、turnMax は「現在の最大ターン数」を表示
   state.turn += 1;
   turnNow.textContent = String(state.turn);
 
@@ -501,7 +500,6 @@ function nextTurn(){
   setButtons({reveal:false, cleanup:false});
   Array.from(gridEl.children).forEach(c=>c.classList.remove("selected"));
 
-  // 先手メッセージ
   if(state.deuce){
     statusEl.textContent = "デュース（延長）中：サドンデスで延長しています。";
   }else if(state.turn===1){
@@ -540,6 +538,7 @@ function revealAndJudge(){
   const ai = state.pendingAI, pl = state.pendingPL;
   let res="Draw";
 
+  // ①ワン特例（質問者の即勝ち条件）
   if(state.qKey==="one"){
     const askerIsPlayer = (state.asker==="player");
     const askerNum = askerIsPlayer ? pl : ai;
@@ -547,10 +546,10 @@ function revealAndJudge(){
     if(askerNum>=1 && askerNum<=9 && (askerNum%10)===(otherNum%10)){
       res = askerIsPlayer ? "Player" : "AI";
     }else{
-      res = judgeByOddPriority(pl, ai);
+      res = judgeCore(pl, ai);  // 通常判定へ
     }
   }else{
-    res = judgeByOddPriority(pl, ai);
+    res = judgeCore(pl, ai);
   }
 
   if(res==="Player") state.score.you++;
@@ -567,31 +566,40 @@ function revealAndJudge(){
 
   cleanup(true);
 }
-function judgeByOddPriority(pl, ai){
+
+/* ★★★ 通常判定：②奇数＞偶数 → ③3の倍数同士は小さい方 → ④その他は大きい方 ★★★ */
+function judgeCore(pl, ai){
   const aiOdd=(ai%2===1), plOdd=(pl%2===1);
+  // ② 奇数偶数ルール
   if(aiOdd!==plOdd){ return plOdd ? "Player" : "AI"; }
+
+  // ③ 3の倍数ルール（双方が3の倍数のときだけ適用）
+  const aiM3 = (ai%3===0), plM3 = (pl%3===0);
+  if(aiM3 && plM3){
+    if(pl<ai) return "Player";
+    if(pl>ai) return "AI";
+    return "Draw";
+  }
+
+  // ④ それ以外は数値の大小
   if(pl>ai) return "Player";
   if(pl<ai) return "AI";
   return "Draw";
 }
 
 function maybeEnterDeuceOrEnd(){
-  // 規定ラウンドが終わっているか？
   const finishedRegular = state.turn >= state.roundsMax;
   if(!finishedRegular) return false;
 
   if(state.score.you === state.score.ai){
-    // ★ デュース突入：1ラウンドずつ延長（サドンデス）
     if(!state.deuce){
       state.deuce = true;
       log(`<b>=== デュース突入（延長） ===</b>`);
     }
-    // 最大ターン数を延長表示（UI上の合計を+1して示す）
     state.roundsMax += 1;
     turnMax.textContent = String(state.roundsMax);
-    return false; // 試合は続行
+    return false; // 続行
   }else{
-    // 同点でなければ試合終了
     endGame();
     return true;
   }
@@ -610,7 +618,6 @@ function cleanup(auto=false){
   setButtons({reveal:false, cleanup:false});
   gridEl.classList.remove("disabled");
 
-  // ★ 規定終了→デュース判定 or 終局
   if(!maybeEnterDeuceOrEnd()){
     nextTurn();
   }
@@ -618,8 +625,8 @@ function cleanup(auto=false){
 
 function endGame(){
   const msg = `最終スコア：あなた ${state.score.you} - ${state.score.ai} AI（引分 ${state.score.draw}）`;
-  log(`<b>=== 終局 ===</b> ${msg}`);
   statusEl.textContent = msg + (state.deuce ? "（延長の末）" : "") + "　新しい対局で再開できます。";
+  log(`<b>=== 終局 ===</b> ${msg}${state.deuce ? "（延長の末）" : ""}`);
   $("#btnReveal").disabled = true; $("#btnCleanup").disabled = true;
 }
 
