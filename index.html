@@ -196,7 +196,7 @@
 /* ========= 質問定義 ========= */
 const QDEF = {
   one:   {type:"rule"},
-  two:   {type:"yn",   fn:x => (x % 2) === 0}, // 偶数判定に変更
+  two:   {type:"yn",   fn:x => (x % 2) === 0}, // 偶数判定に変更（仕様確定）
   three: {type:"yn",   fn:x => x%3===0},
   four:  {type:"four"},
   five:  {type:"mod5"},
@@ -285,7 +285,9 @@ function setQuestionUIEnabled(enabled){
 function syncRevealButton(){
   const numbersReady = (state.pendingPL!=null && state.pendingAI!=null);
   let qReady = !!state.qKey;
-  // ★Fourは評価が済むまでリビール不可（空入力で事故評価しない）
+  // 後攻がAIなら、質問は公開直前に生成するので qKey が無くてもリビール可
+  if(state.asker==="ai") qReady = true;
+  // Fourは評価が済むまでリビール不可（空入力で事故評価しない）
   if(state.qKey==="four") qReady = qReady && state.qEvaluated;
   $("#btnReveal").disabled = !(numbersReady && qReady) || state.revealed;
 }
@@ -549,7 +551,7 @@ document.querySelectorAll(".qbtn").forEach(btn=>{
     state.qKey = btn.dataset.q;
     state.qAsker = "player";
 
-    // Fourは入力待ち → ここでは評価しない（従来は即評価してしまっていた）
+    // Fourは入力待ち → ここでは評価しない
     fourInput.disabled = (state.qKey!=="four");
     if(state.qKey==="four"){
       state.qFourSet=[]; fourInput.value="";
@@ -697,7 +699,7 @@ function nextTurn(){
     statusEl.textContent = `対局開始。先取本数は ${state.winTarget}。`;
   }
   if(state.turnStarter==="player"){
-    // あなた先手：AIは質問者
+    // あなた先手：AIは質問者（質問は公開直前に実行）
   }else{
     state.pendingAI = aiPickNumber();
   }
@@ -708,13 +710,9 @@ function nextTurn(){
 /* あなたが数字を選んだとき */
 function onPlayerPickedMaybeAdvance(){
   if(state.pendingPL==null){ syncRevealButton(); return; }
-  if(state.turnStarter==="player"){
-    if(!state.qKey) aiChooseQuestion();
-    evaluateQuestionImmediately();
-    if(state.pendingAI==null) state.pendingAI = aiPickNumber();
-  }else{
-    evaluateQuestionImmediately();
-  }
+  // 先手（あなた）のクリック段階ではAI質問は走らせない。
+  // ただしAIの出目は先に決めておく（公開可にするため）
+  if(state.pendingAI==null) state.pendingAI = aiPickNumber();
   syncRevealButton();
 }
 
@@ -722,8 +720,18 @@ function onPlayerPickedMaybeAdvance(){
 function revealAndJudge(){
   if(state.revealed) return;
   if(state.pendingPL==null || state.pendingAI==null){ alert("両者の数字が未確定です。"); return; }
-  if(!state.qKey){ alert("質問を選んでください。（質問者は後攻です）"); return; }
+
+  // 公開直前に、後攻がAIなら質問をここで生成・評価する
+  if(!state.qKey){
+    if(state.asker==="ai"){
+      aiChooseQuestion(); // 中で評価も実行される
+    }else{
+      alert("質問を選んでください。（質問者は後攻です）");
+      return;
+    }
+  }
   if(!state.qEvaluated) evaluateQuestionImmediately();
+
   state.qLocked = true; setQuestionUIEnabled(state.asker==="player");
 
   const ai = state.pendingAI, pl = state.pendingPL;
