@@ -173,7 +173,7 @@
     <dt>ワン</dt>
     <dd>そのターン限定の特例：質問者が<b>1〜9</b>を出し、相手の<b>下1桁</b>と一致したら質問者の<b>即勝利</b>（通常判定より優先）。</dd>
     <dt>ツー</dt>
-    <dd>相手の<b>10の位が2の倍数</b>か（Yes/No）。例：20〜29, 40〜49, 60〜69, 80〜89。</dd>
+    <dd>相手が<b>偶数</b>か（Yes/No）。</dd>
     <dt>スリー</dt>
     <dd>相手が<b>3の倍数</b>か（Yes/No）。</dd>
     <dt>フォー</dt>
@@ -196,7 +196,7 @@
 /* ========= 質問定義 ========= */
 const QDEF = {
   one:   {type:"rule"},
-  two:   {type:"yn",   fn:x => Math.floor(x/10)%2===0},
+  two:   {type:"yn",   fn:x => (x % 2) === 0}, // 偶数判定に変更
   three: {type:"yn",   fn:x => x%3===0},
   four:  {type:"four"},
   five:  {type:"mod5"},
@@ -685,6 +685,7 @@ function nextTurn(){
 
   state.pendingAI=null; state.pendingPL=null;
   state.qKey=null; state.qLocked=false; state.qEvaluated=false; state.qFourSet=[];
+  state.qAsker=null;
   state.revealed=false;
   setQuestionUIEnabled(state.asker==="player");
   setButtons({reveal:false, cleanup:false});
