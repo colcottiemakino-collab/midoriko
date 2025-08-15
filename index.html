@@ -152,7 +152,7 @@
     <div><b>AI未使用（=残り）</b></div>
     <div id="listAI" class="listbox"></div>
     <div style="height:8px"></div>
-
+    <!-- 「AIが推定する“あなたの候補”」ブロックを削除 -->
     <div class="sep"></div>
     <h2>ログ</h2>
     <div id="log" class="log"></div>
@@ -275,8 +275,8 @@ function numArrayDesc(set){ return Array.from(set).sort((a,b)=>b-a); }
 function renderLists(){
   listAI.textContent = numArrayDesc(state.availableAI).join(", ");
   const arrOpp = numArrayDesc(state.oppCandidates);
-  oppCount.textContent = arrOpp.length;
-  listOpp.textContent = arrOpp.slice(0,160).join(", ") + (arrOpp.length>160 ? " ..." : "");
+  if(oppCount) oppCount.textContent = arrOpp.length;   // ← 要素が無い場合はスキップ
+  if(listOpp)  listOpp.textContent  = arrOpp.slice(0,160).join(", ") + (arrOpp.length>160 ? " ..." : "");
 }
 function renderGrid(){
   gridEl.innerHTML="";
@@ -454,145 +454,6 @@ function buildFourSetFromCandidates(candSet){
   return [...new Set(picks.filter(Number.isInteger))].slice(0,4);
 }
 
-/* ========= AIの出目ロジック ========= */
-function aiPickNumber(){
-  const diff = $("#difficulty").value;
-
-  if(diff==="hell"){
-    const aiIsStarter = (state.turnStarter==="ai");
-    return pickByWinrate(state.availableAI, {aiIsStarter, remain: state.availableAI.size});
-  }
-
-  if(diff==="expert"){
-    const aiIsStarter = (state.turnStarter==="ai");
-    if(aiIsStarter){
-      if(Math.random()<0.75){ state.lastTactic="decoy"; return tactic90Decoy(state.availableAI); }
-      state.lastTactic="odd-threat"; return tacticOddThreat(state.availableAI);
-    }else{
-      const remain = state.availableAI.size;
-      const oddExist = [...state.availableAI].some(x=>x%2===1);
-      if(remain>30 && oddExist){
-        state.lastTactic="odd-threat"; return tacticOddThreat(state.availableAI);
-      }
-      const r=Math.random();
-      if(oddExist && r<0.7){ state.lastTactic="odd-threat"; return tacticOddThreat(state.availableAI); }
-      if(r<0.85){ state.lastTactic="decoy"; return tactic90Decoy(state.availableAI); }
-      state.lastTactic="sleepless-hint"; return tacticNormal(state.availableAI);
-    }
-  }
-
-  if(diff==="hard" && isSleeplessPressure()){
-    const choice = pickEvenEscape(state.availableAI);
-    state.lastTactic = "even-escape";
-    return choice;
-  }
-
-  let useSleepless=false, useDecoy=false;
-  if(diff==="hard"){
-    const r=Math.random();
-    if(r<0.5) useSleepless=true; else if(r<0.9) useDecoy=true;
-  }else{
-    const base=(diff==="normal")?0.12:0.07;
-    const canStrong = (state.lastTactic!=="sleepless" && state.lastTactic!=="decoy");
-    if(canStrong && Math.random()<base){ if(Math.random()<0.5) useSleepless=true; else useDecoy=true; }
-  }
-  let choice;
-  if(useSleepless){ choice=tacticSleepless(state.availableAI); state.lastTactic="sleepless"; }
-  else if(useDecoy){ choice=tactic90Decoy(state.availableAI); state.lastTactic="decoy"; }
-  else { choice=tacticNormal(state.availableAI); state.lastTactic="normal"; }
-  return choice;
-}
-
-/* ========= 即時回答（qAskerで対象固定） ========= */
-function evaluateQuestionImmediately(){
-  if(!state.qKey || state.qEvaluated) return;
-  const asker = state.qAsker;
-  if(!asker) return;
-
-  const def = QDEF[state.qKey];
-  const target = (asker==="ai") ? state.pendingPL : state.pendingAI;
-  if(target==null) return;
-
-  if(def.type==="rule"){
-    log(`→ ルール変更（ワン）は公開時に適用可否を判定`);
-    state.qEvaluated = true;
-    return;
-  }
-  if(def.type==="yn"){
-    const truth = !!def.fn(target);
-    if(asker==="ai"){
-      const next=new Set(); for(const x of state.oppCandidates){ if(!!def.fn(x)===truth) next.add(x); }
-      state.oppCandidates=next; renderLists();
-      log(`<b>AIの質問: ${QLABEL[state.qKey]}</b> → <b>${truth?'Yes':'No'}</b>`);
-    }else{
-      log(`<b>あなたの質問: ${QLABEL[state.qKey]}</b> → <b>${truth?'Yes':'No'}</b>`);
-    }
-    state.qEvaluated = true; state.qLocked = true; setQuestionUIEnabled(state.asker==="player");
-    return;
-  }
-  if(def.type==="four"){
-    if(asker==="player" && (!state.qFourSet || state.qFourSet.length===0)){
-      return;
-    }
-    const set=new Set(state.qFourSet);
-    const truth = set.has(target);
-    if(asker==="ai"){
-      const next=new Set(); for(const x of state.oppCandidates){ if(set.has(x)===truth) next.add(x); }
-      state.oppCandidates=next; renderLists();
-      log(`<b>AIの質問: フォー</b> [${state.qFourSet.join(", ")}] → <b>${truth?'Yes':'No'}</b>`);
-    }else{
-      log(`<b>あなたの質問: フォー</b> [${state.qFourSet.join(", ")}] → <b>${truth?'Yes':'No'}</b>`);
-    }
-    state.qEvaluated = true; state.qLocked = true; setQuestionUIEnabled(state.asker==="player");
-    return;
-  }
-  if(def.type==="mod5"){
-    const r = (target%5+5)%5;
-    if(asker==="ai"){
-      const next=new Set(); for(const x of state.oppCandidates){ if(((x%5+5)%5)===r) next.add(x); }
-      state.oppCandidates=next; renderLists();
-      log(`<b>AIの質問: ファイブ</b> → <b>余り ${r}</b>`);
-    }else{
-      log(`<b>あなたの質問: ファイブ</b> → <b>余り ${r}</b>`);
-    }
-    state.qEvaluated = true; state.qLocked = true; setQuestionUIEnabled(state.asker==="player");
-    return;
-  }
-}
-
-/* ========= 質問UI（あなた側） ========= */
-document.querySelectorAll(".qbtn").forEach(btn=>{
-  btn.addEventListener("click", ()=>{
-    if(state.asker!=="player" || state.qLocked || state.revealed) return;
-    document.querySelectorAll(".qbtn").forEach(b=>b.classList.remove("chosen"));
-    btn.classList.add("chosen");
-    state.qKey = btn.dataset.q;
-    state.qAsker = "player";
-
-    fourInput.disabled = (state.qKey!=="four");
-    if(state.qKey==="four"){
-      state.qFourSet=[]; fourInput.value="";
-      log(`<b>あなたの質問</b>: フォー（このターンはロック） <span class="hint">→ 下の欄に数字を最大4つ入力して確定</span>`);
-      fourInput.focus();
-    }else{
-      log(`<b>あなたの質問</b>: ${QLABEL[state.qKey]}（このターンはロック）`);
-      evaluateQuestionImmediately();
-    }
-    syncRevealButton();
-  });
-});
-
-// 入力が入った時点でFourを評価
-fourInput.addEventListener("change", ()=>{
-  if(state.qLocked) return;
-  const vals = fourInput.value.trim().split(/\s+/).filter(s=>s.length>0).map(s=>parseInt(s,10)).filter(n=>Number.isInteger(n)&&n>=1&&n<=100);
-  state.qFourSet = [...new Set(vals)].slice(0,4);
-  fourInput.value = state.qFourSet.join(" ");
-  log(`<span class="hint">フォー集合: [${state.qFourSet.join(", ")}]</span>`);
-  evaluateQuestionImmediately();
-  syncRevealButton();
-});
-
 /* ========= AIの質問選択（Hell=情報利得、Expert=スリー優先） ========= */
 function splitScoreForQuestion(qKey, candSet, fourSetOpt){
   const def = QDEF[qKey]; if(!def) return -1;
@@ -615,17 +476,6 @@ function splitScoreForQuestion(qKey, candSet, fourSetOpt){
   }
   if(qKey==="one"){ return -Infinity; }
   return -Infinity;
-}
-function buildFourSetFromCandidates(candSet){
-  const arr = Array.from(candSet).sort((a,b)=>a-b);
-  if(arr.length===0) return [];
-  const picks = [];
-  const pts = [0.2, 0.4, 0.6, 0.8];
-  for(const p of pts){
-    const idx = Math.max(0, Math.min(arr.length-1, Math.floor(arr.length*p)));
-    picks.push(arr[idx]);
-  }
-  return [...new Set(picks.filter(Number.isInteger))].slice(0,4);
 }
 function aiChooseQuestion(){
   if(state.qLocked) return;
@@ -841,6 +691,3 @@ resetGame();
 </script>
 </body>
 </html>
-
-
-
