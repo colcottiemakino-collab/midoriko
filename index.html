@@ -15,7 +15,6 @@
     font-family:ui-sans-serif,system-ui,"Segoe UI",Roboto,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;}
   header{padding:18px 20px; border-bottom:1px solid var(--border); display:flex; gap:12px; align-items:baseline; flex-wrap:wrap}
   h1{margin:0; font-size:20px; letter-spacing:.08em; color:var(--accent)}
-  .tag{padding:2px 8px; border:1px solid var(--border); border-radius:999px; color:var(--muted); font-size:12px}
   main{display:grid; grid-template-columns: 420px 1fr 340px; gap:16px; padding:16px}
   @media (max-width: 1200px){ main{grid-template-columns: 1fr} }
 
@@ -59,15 +58,13 @@
   .rules{font-size:12px; color:var(--muted); line-height:1.6}
   .rules dt{color:var(--text); margin-top:6px}
   .rules dd{margin:2px 0 6px 0}
+  .rules ul{margin:6px 0 0 18px; padding:0}
+  .rules li{margin:2px 0}
 </style>
 </head>
 <body>
 <header>
   <h1>ハンドレッド / Hundred ver 2.7.1</h1>
-  <span class="tag">緑テーマ</span>
-  <span class="tag">同時公開→判定→自動削除（リーク防止）</span>
-  <span class="tag">奇数優先＋3の倍数小勝ち</span>
-  <span class="tag">先取本数＋デュース（Win by 2）</span>
 </header>
 
 <main>
@@ -134,20 +131,15 @@
       <label for="fourSet" class="hint">フォー用（1〜100の数字を最大4つ、空白区切り）</label>
       <input id="fourSet" placeholder="例: 17 33 70 98" disabled />
     </div>
-    <div class="muted">※ 後攻（質問者）のときだけ選べます。選んだら<b>即回答</b>がログ表示。<b>このターンは1回のみ</b>選択可能。<br>
+    <div class="muted">※ 後攻（質問者）のときだけ選べます。選んだら<b>即回答</b>がログ表示。このターンは<b>1回のみ</b>選択可能。<br>
     <span class="hint">フォーは<b>数字を入力してから</b>評価されます。</span></div>
   </section>
 
-  <!-- 中：盤面（あなたの未使用数字だけを表示） -->
+  <!-- 中：盤面（あなたの未使用数字だけ） -->
   <section class="card">
     <h2>盤面（あなたの未使用の数字）</h2>
     <div id="grid" class="grid"></div>
-    <div class="muted" style="margin-top:6px">
-      勝敗判定の優先順：<b>①ワン特例 → ②奇数は偶数に勝つ → ③3の倍数同士は小さい方が勝つ → ④それ以外は大きい方が勝つ</b>。同値は引分。<br/>
-      使った数字は公開→判定の直後に<b>自動で削除</b>され、同じ数字は二度と使えません。<br/>
-      ※ 数字の山は<b>共用ではなく個別</b>です。AIが使った数字でも、あなたの山からは消えません。<br/>
-      ※ 勝負は<b>先取本数方式</b>。リードが<b>1点差</b>のままでは決着せず、<b>両者が先取本数に到達（例：5-5）するとデュース（Win by 2）</b>になります。
-    </div>
+    <!-- ここにあった長文の説明は下部の「ゲームルール（まとめ）」へ移動 -->
   </section>
 
   <!-- 右：相手情報＆ログ -->
@@ -167,36 +159,52 @@
   </section>
 </main>
 
+<!-- 一番下：ルールまとめ -->
 <section class="card" style="margin:0 16px 16px">
-  <h2>質問ワードの効果（ワン〜ナイン）</h2>
-  <dl class="rules">
-    <dt>ワン</dt>
-    <dd>そのターン限定の特例：質問者が<b>1〜9</b>を出し、相手の<b>下1桁</b>と一致したら質問者の<b>即勝利</b>（通常判定より優先）。</dd>
-    <dt>ツー</dt>
-    <dd>相手が<b>偶数</b>か（Yes/No）。</dd>
-    <dt>スリー</dt>
-    <dd>相手が<b>3の倍数</b>か（Yes/No）。</dd>
-    <dt>フォー</dt>
-    <dd>あなたが<b>最大4つの数字</b>を指定し、そのいずれかか（Yes/No）。</dd>
-    <dt>ファイブ</dt>
-    <dd>相手の数を<b>5で割った余り</b>（0〜4）を回答。</dd>
-    <dt>シックス</dt>
-    <dd>相手が<b>60未満</b>か（Yes/No）。</dd>
-    <dt>セブン</dt>
-    <dd>相手の表記が<b>“7”を含む</b>か（Yes/No）。例：17, 27, 70〜79, 97。</dd>
-    <dt>エイト</dt>
-    <dd>相手が<b>80〜89</b>か（Yes/No）。</dd>
-    <dt>ナイン</dt>
-    <dd>相手が<b>90以上（100含む）</b>か（Yes/No）。</dd>
-  </dl>
-  <div class="muted"><b>デュース（Win by 2）：</b>両者が先取本数に到達したら（例：5-5）、以後は<b>2点差がつくまで</b>延長します。</div>
+  <h2>ゲームルール（まとめ）</h2>
+  <div class="rules">
+    <dt>基本ルール</dt>
+    <dd>
+      <ul>
+        <li>あなたとAIは、それぞれ1〜100の数字カードを持つ。</li>
+        <li>先手・後手で1枚ずつ同時に出し、基本は<b>大きい数字が勝ち</b>。同じなら引分。</li>
+        <li>使ったカードは<b>再使用不可</b>。</li>
+        <li>交互に進め、先に規定本数に到達した側が勝ち。ただし<b>1点差では決着しない</b>。</li>
+        <li>両者が先取本数に到達したら<b>デュース（Win by 2）</b>へ移行。</li>
+      </ul>
+    </dd>
+
+    <dt>応用ルール</dt>
+    <dd>
+      <ul>
+        <li><b>偶数はすべての奇数に負ける</b>（最優先ルール）。</li>
+        <li><b>双方が3の倍数</b>のときのみ、<b>小さい方が勝ち</b>（上の偶奇ルールより弱い）。</li>
+        <li>後述の<b>「ワン」特例</b>が成功すると、そのターンはワン側が即勝利。</li>
+      </ul>
+    </dd>
+
+    <dt>質問ワードの効果（ワン〜ナイン）</dt>
+    <dd>
+      <ul>
+        <li><b>ワン</b>：このターン限定。質問者が<b>1〜9</b>を出し、相手の<b>下1桁</b>と一致したら<b>即勝利</b>（通常判定より優先）。</li>
+        <li><b>ツー</b>：相手が<b>偶数</b>か（Yes/No）。</li>
+        <li><b>スリー</b>：相手が<b>3の倍数</b>か（Yes/No）。</li>
+        <li><b>フォー</b>：指定した<b>最大4つの数字</b>のいずれかか（Yes/No）。</li>
+        <li><b>ファイブ</b>：相手の数を<b>5で割った余り</b>（0〜4）。</li>
+        <li><b>シックス</b>：相手が<b>60未満</b>か（Yes/No）。</li>
+        <li><b>セブン</b>：相手の表記が<b>“7”を含む</b>か（Yes/No）。例：17, 27, 70〜79, 97。</li>
+        <li><b>エイト</b>：相手が<b>80〜89</b>か（Yes/No）。</li>
+        <li><b>ナイン</b>：相手が<b>90以上（100含む）</b>か（Yes/No）。</li>
+      </ul>
+    </dd>
+  </div>
 </section>
 
 <script>
 /* ========= 質問定義 ========= */
 const QDEF = {
   one:   {type:"rule"},
-  two:   {type:"yn",   fn:x => (x % 2) === 0}, // 偶数判定に変更（仕様確定）
+  two:   {type:"yn",   fn:x => (x % 2) === 0}, // 偶数判定（仕様）
   three: {type:"yn",   fn:x => x%3===0},
   four:  {type:"four"},
   five:  {type:"mod5"},
@@ -285,9 +293,7 @@ function setQuestionUIEnabled(enabled){
 function syncRevealButton(){
   const numbersReady = (state.pendingPL!=null && state.pendingAI!=null);
   let qReady = !!state.qKey;
-  // 後攻がAIなら、質問は公開直前に生成するので qKey が無くてもリビール可
   if(state.asker==="ai") qReady = true;
-  // Fourは評価が済むまでリビール不可（空入力で事故評価しない）
   if(state.qKey==="four") qReady = qReady && state.qEvaluated;
   $("#btnReveal").disabled = !(numbersReady && qReady) || state.revealed;
 }
@@ -512,7 +518,6 @@ function evaluateQuestionImmediately(){
     return;
   }
   if(def.type==="four"){
-    // ★プレイヤーのFourで集合未入力なら評価しない（空打ち防止）
     if(asker==="player" && (!state.qFourSet || state.qFourSet.length===0)){
       return;
     }
@@ -551,14 +556,12 @@ document.querySelectorAll(".qbtn").forEach(btn=>{
     state.qKey = btn.dataset.q;
     state.qAsker = "player";
 
-    // Fourは入力待ち → ここでは評価しない
     fourInput.disabled = (state.qKey!=="four");
     if(state.qKey==="four"){
       state.qFourSet=[]; fourInput.value="";
       log(`<b>あなたの質問</b>: フォー（このターンはロック） <span class="hint">→ 下の欄に数字を最大4つ入力して確定</span>`);
       fourInput.focus();
     }else{
-      // Four以外は従来通り即時評価
       log(`<b>あなたの質問</b>: ${QLABEL[state.qKey]}（このターンはロック）`);
       evaluateQuestionImmediately();
     }
@@ -710,8 +713,6 @@ function nextTurn(){
 /* あなたが数字を選んだとき */
 function onPlayerPickedMaybeAdvance(){
   if(state.pendingPL==null){ syncRevealButton(); return; }
-  // 先手（あなた）のクリック段階ではAI質問は走らせない。
-  // ただしAIの出目は先に決めておく（公開可にするため）
   if(state.pendingAI==null) state.pendingAI = aiPickNumber();
   syncRevealButton();
 }
@@ -721,10 +722,9 @@ function revealAndJudge(){
   if(state.revealed) return;
   if(state.pendingPL==null || state.pendingAI==null){ alert("両者の数字が未確定です。"); return; }
 
-  // 公開直前に、後攻がAIなら質問をここで生成・評価する
   if(!state.qKey){
     if(state.asker==="ai"){
-      aiChooseQuestion(); // 中で評価も実行される
+      aiChooseQuestion();
     }else{
       alert("質問を選んでください。（質問者は後攻です）");
       return;
