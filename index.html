@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>ハンドレッド / Hundred ver 3.1.3</title>
+<title>ハンドレッド / Hundred ver 3.1.3-fix</title>
 <style>
   :root{
     --bg:#0e1a12; --bg2:#122216; --panel:#152a1b; --accent:#35c46e; --accent-2:#2aa55b;
@@ -60,7 +60,7 @@
 </head>
 <body>
 <header>
-  <h1>ハンドレッド / Hundred ver 3.1.3</h1>
+  <h1>ハンドレッド / Hundred ver 3.1.3-fix</h1>
 </header>
 
 <main>
@@ -202,7 +202,7 @@ const QLABEL = {
   six:"シックス", seven:"セブン", eight:"エイト", nine:"ナイン"
 };
 
-/* ========= デコイ集合（そのまま） ========= */
+/* ========= デコイ集合 ========= */
 const STRONG_DECOYS = [90, 80, 70, 96, 84, 78, 72];
 const NEXT_DECOYS   = [98, 94, 92, 88, 86, 82, 76, 74];
 const ALL_DECOYS = [...STRONG_DECOYS, ...NEXT_DECOYS];
@@ -273,6 +273,11 @@ function setQuestionUIEnabled(enabled){
 }
 function clearQChosen(){ document.querySelectorAll(".qbtn").forEach(b=>b.classList.remove("chosen")); }
 function syncRevealButton(){
+  // 保険：AIが質問者で qKey 未確定なら自動確定
+  if(state.asker === "ai" && !state.qKey && !state.revealed){
+    state.qAsker = "ai";
+    aiChooseQuestion();
+  }
   const numbersReady = (state.pendingPL!=null && state.pendingAI!=null);
   let qReady = !!state.qKey;
   if(state.asker==="ai" && !state.qKey) qReady = false; // AIも原則、権利が確定してから公開
@@ -360,7 +365,7 @@ function tacticNormal(avail){
   return ev.length? ev[0] : Math.max(...arr);
 }
 
-/* ========= 勝率＆情報利得ユーティリティ（そのまま） ========= */
+/* ========= 勝率＆情報利得ユーティリティ ========= */
 function judgeCore(pl, ai){
   const aiOdd=(ai%2===1), plOdd=(pl%2===1);
   if(aiOdd!==plOdd){ return plOdd ? "Player" : "AI"; }
@@ -422,7 +427,7 @@ function buildSetFromCandidates(candSet, k){
   return [...new Set(picks.filter(Number.isInteger))].slice(0,k);
 }
 
-/* ========= AIの出目ロジック（そのまま） ========= */
+/* ========= AIの出目ロジック ========= */
 function aiPickNumber(){
   const diff = $("#difficulty").value;
 
@@ -715,6 +720,13 @@ function nextTurn(){
 function onPlayerPickedMaybeAdvance(){
   if(state.pendingPL==null){ syncRevealButton(); return; }
   if(state.pendingAI==null){ state.pendingAI = aiPickNumber(); }
+
+  // ★ 追加：AIが質問者なら、ここでAIの質問を自動確定
+  if(state.asker === "ai" && !state.qKey && !state.revealed){
+    state.qAsker = "ai";
+    aiChooseQuestion();           // 中で evaluateQuestionImmediately() まで走る
+  }
+
   syncRevealButton();
 }
 
