@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>ハンドレッド / Hundred ver 3.1.3-fix</title>
+<title>ハンドレッド / Hundred ver 3.1.4-custom</title>
 <style>
   :root{
     --bg:#0e1a12; --bg2:#122216; --panel:#152a1b; --accent:#35c46e; --accent-2:#2aa55b;
@@ -60,7 +60,7 @@
 </head>
 <body>
 <header>
-  <h1>ハンドレッド / Hundred ver 3.1.3-fix</h1>
+  <h1>ハンドレッド / Hundred ver 3.1.4-custom</h1>
 </header>
 
 <main>
@@ -171,38 +171,38 @@
 　９９と３なら３の勝ちですが、９９と６は９９の勝ちです。奇数なので。
 (3)後述する「ワン」を利用した場合、成功すれば「ワン」が勝ちます。
 
-【9つの権利（後攻専用、ver3.1.3）】
+【9つの権利（後攻専用、ver3.1.4）】
 ワン    このターン限定の特例：質問者が1〜9を出し、相手の下1桁と一致したら質問者の即勝利
 ツー    質問者の自分の数に +2（100を超えてもよい）
 スリー  相手が３の倍数か聞ける（Yes/No）
 フォー  相手の数を4で割った余り（0〜3）を聞ける
 ファイブ 相手の数を5で割った余り（0〜4）を聞ける
 シックス あなたが最大6つの数字を指定し、そのいずれかかどうかを聞ける（Yes/No）
-セブン  あなたの数字の「10 の位」を 7 にする（例: 53→73）。変換元・変換先は自分側で未使用であること。使用後、消費されるのは変換元のみ。<b>失敗時はやり直し（質問も数字も再選択可）</b>。
+セブン  あなたの数字の「10 の位」を 7 にする（例: 53→73）。<b>変換は常に成功</b>。<b>消費されるのは変換元のみ</b>。
 エイト  相手が80以上かどうかを聞ける（Yes/No）
 ナイン  質問者の自分の数を9倍にする（上限なし）
 </pre>
 </section>
 
 <script>
-/* ========= 質問定義（ver3.1.3） ========= */
+/* ========= 質問定義（ver3.1.4） ========= */
 const QDEF = {
   one:   {type:"rule"},
-  two:   {type:"self", op:"plus2"},             // 自分の数を+2
-  three: {type:"yn",   fn:x => x%3===0},        // 3の倍数か
-  four:  {type:"mod4"},                         // 4の余り
-  five:  {type:"mod5"},                         // 5の余り
-  six:   {type:"setN", n:6},                    // 6つ候補Yes/No
-  seven: {type:"self", op:"to70s"},             // 自分の数の10の位を7にする（fromのみ消費、失敗はやり直し）
-  eight: {type:"yn",   fn:x => x>=80},          // 80以上
-  nine:  {type:"self", op:"times9"}             // 自分の数を9倍
+  two:   {type:"self", op:"plus2"},
+  three: {type:"yn",   fn:x => x%3===0},
+  four:  {type:"mod4"},
+  five:  {type:"mod5"},
+  six:   {type:"setN", n:6},
+  seven: {type:"self", op:"to70s"}, // 変換は常成功・判定は変身後
+  eight: {type:"yn",   fn:x => x>=80},
+  nine:  {type:"self", op:"times9"}
 };
 const QLABEL = {
   one:"ワン", two:"ツー", three:"スリー", four:"フォー", five:"ファイブ",
   six:"シックス", seven:"セブン", eight:"エイト", nine:"ナイン"
 };
 
-/* ========= デコイ集合 ========= */
+/* ========= デコイ集合（流用） ========= */
 const STRONG_DECOYS = [90, 80, 70, 96, 84, 78, 72];
 const NEXT_DECOYS   = [98, 94, 92, 88, 86, 82, 76, 74];
 const ALL_DECOYS = [...STRONG_DECOYS, ...NEXT_DECOYS];
@@ -223,13 +223,13 @@ const state = {
   oppCandidates: new Set(),
   pendingAI: null,
   pendingPL: null,
-  baseAI: null,           // 元の選択（自己操作で値が変わっても、消費するのはこの元カード）
+  baseAI: null,
   basePL: null,
   score: {you:0, ai:0, draw:0},
   lastTactic: "normal",
 
   qKey:null, qLocked:false, qEvaluated:false,
-  qSetN:[],                // シックス用の集合（最大6）
+  qSetN:[],
   qAsker:null,
 
   revealed:false,
@@ -256,7 +256,7 @@ function renderGrid(){
       cell.addEventListener("click", ()=>{
         if(state.revealed) return;
         state.pendingPL = (state.pendingPL===n ? null : n);
-        state.basePL = state.pendingPL; // 元カードを常に最新の選択へ同期
+        state.basePL = state.pendingPL;
         Array.from(gridEl.children).forEach(c=>c.classList.remove("selected"));
         if(state.pendingPL===n) cell.classList.add("selected");
         onPlayerPickedMaybeAdvance();
@@ -273,14 +273,13 @@ function setQuestionUIEnabled(enabled){
 }
 function clearQChosen(){ document.querySelectorAll(".qbtn").forEach(b=>b.classList.remove("chosen")); }
 function syncRevealButton(){
-  // 保険：AIが質問者で qKey 未確定なら自動確定
   if(state.asker === "ai" && !state.qKey && !state.revealed){
     state.qAsker = "ai";
     aiChooseQuestion();
   }
   const numbersReady = (state.pendingPL!=null && state.pendingAI!=null);
   let qReady = !!state.qKey;
-  if(state.asker==="ai" && !state.qKey) qReady = false; // AIも原則、権利が確定してから公開
+  if(state.asker==="ai" && !state.qKey) qReady = false;
   if(state.qKey==="six") qReady = qReady && state.qEvaluated;
   $("#btnReveal").disabled = !(numbersReady && qReady) || state.revealed;
 }
@@ -312,7 +311,7 @@ function resetGame(){
   nextTurn();
 }
 
-/* ========= スリープレス圧など（ver2のまま） ========= */
+/* ========= 既存ユーティリティ（判定など） ========= */
 function isSleeplessPressure(){
   const p = state.history.player;
   if(p.length===0) return false;
@@ -321,51 +320,6 @@ function isSleeplessPressure(){
   if(last>=69 && (last%3===0 || (last-1)%3===0 || (last+1)%3===0)) return true;
   return false;
 }
-function pickEvenEscape(avail){
-  const wishlist = [96, 84, 78, 72, 66, 60, 90, 48, 36, 30];
-  for(const k of wishlist){ if(avail.has(k)) return k; }
-  const arr=[...avail].sort((a,b)=>a-b);
-  for(const x of arr){ if(x%2===0 && x%3===0) return x; }
-  for(const x of arr){ if(x%2===0) return x; }
-  return arr[0];
-}
-
-/* ========= AIの戦術（ver2のまま） ========= */
-function tacticSleepless(avail){
-  const arr=[...avail];
-  const prio = arr.filter(x=> x%2===1 && x%3===0 && x>=69);
-  if(prio.length) return Math.max(...prio);
-  const odd = arr.filter(x=> x%2===1);
-  if(odd.length) return Math.max(...odd);
-  const ev = arr.filter(x=>x%2===0).sort((a,b)=>a-b);
-  return ev.length? ev[0] : Math.max(...arr);
-}
-function tactic90Decoy(avail){
-  for(const k of ALL_DECOYS){ if(avail.has(k)) return k; }
-  const arr = [...avail].sort((a,b)=>a-b);
-  for(const x of arr){ if(x%2===0) return x; }
-  for(const x of arr){ if(x%2===1) return x; }
-  return arr[0];
-}
-function tacticOddThreat(avail){
-  const odd = [...avail].filter(x=>x%2===1).sort((a,b)=>b-a);
-  if(odd.length===0) return Math.max(...avail);
-  const non3 = odd.filter(x=>x%3!==0);
-  return (non3.length? non3[0] : odd[0]);
-}
-function tacticNormal(avail){
-  const arr=[...avail];
-  const odd = arr.filter(x=>x%2===1);
-  if(odd.length>=10){
-    const o80 = odd.filter(x=>x>=80); if(o80.length) return Math.max(...o80);
-    const o70 = odd.filter(x=>x>=70); if(o70.length) return Math.max(...o70);
-  }
-  if(odd.length) return Math.max(...odd);
-  const ev = arr.filter(x=>x%2===0).sort((a,b)=>a-b);
-  return ev.length? ev[0] : Math.max(...arr);
-}
-
-/* ========= 勝率＆情報利得ユーティリティ ========= */
 function judgeCore(pl, ai){
   const aiOdd=(ai%2===1), plOdd=(pl%2===1);
   if(aiOdd!==plOdd){ return plOdd ? "Player" : "AI"; }
@@ -379,6 +333,96 @@ function judgeCore(pl, ai){
   if(pl<ai) return "AI";
   return "Draw";
 }
+
+/* ========= 難易度別 数字選択ロジック（依頼仕様） ========= */
+// 共通ヘルパ
+function pickRandom(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function oddsFrom(set){ return [...set].filter(x=>x%2===1); }
+function oddsLarge(set){ const o=oddsFrom(set); if(o.length===0) return null; return o.sort((a,b)=>b-a)[0]; }
+function oddsLargePref(set){
+  const o=oddsFrom(set); if(o.length===0) return null;
+  const sorted = o.sort((a,b)=>b-a);
+  // 比較的大きい: 上位30%を優先、なければ最大
+  const k = Math.max(1, Math.floor(sorted.length*0.3));
+  const top = sorted.slice(0,k);
+  return pickRandom(top);
+}
+function oddsLargeExcept3Small(set){
+  const o=oddsFrom(set); if(o.length===0) return null;
+  const m3 = o.filter(x=>x%3===0).sort((a,b)=>a-b);     // 3の倍数の奇数は小さめ優先
+  const non = o.filter(x=>x%3!==0).sort((a,b)=>b-a);    // それ以外は大きめ優先
+  if(non.length>0) return non[0];
+  if(m3.length>0) return m3[0];
+  return pickRandom(o);
+}
+function oddsRandom(set){ const o=oddsFrom(set); if(o.length===0) return null; return pickRandom(o); }
+function oddsRandom3Multiple(set){
+  const o=[...set].filter(x=>x%2===1 && x%3===0);
+  if(o.length===0) return null;
+  return pickRandom(o);
+}
+
+/* ========= 難易度別：AIの出目 ========= */
+function aiPickNumber(){
+  const diff = $("#difficulty").value;
+  const aiIsStarter = (state.turnStarter==="ai");
+
+  // hellは「今は余計な情報を与えない」ので従来の勝率ロジックを使用
+  if(diff==="hell"){
+    const pick = pickByWinrate(state.availableAI, {aiIsStarter, remain: state.availableAI.size});
+    state.baseAI = pick; return pick;
+  }
+
+  if(diff==="easy"){
+    // 先攻後攻にかかわらず奇数をランダム
+    let pick = oddsRandom(state.availableAI);
+    if(pick==null){ // 奇数が尽きたら適当に
+      const arr=[...state.availableAI]; pick = pickRandom(arr);
+    }
+    state.baseAI=pick; return pick;
+  }
+
+  if(diff==="normal"){
+    // 先攻後攻にかかわらず奇数の比較的大きい数字を優先
+    let pick = oddsLargePref(state.availableAI);
+    if(pick==null){
+      // 仕方なく他を
+      const arr=[...state.availableAI]; pick = Math.max(...arr);
+    }
+    state.baseAI=pick; return pick;
+  }
+
+  if(diff==="hard"){
+    // 先攻後攻にかかわらず：奇数は大きめ、ただし3の倍数の奇数は小さめを優先
+    let pick = oddsLargeExcept3Small(state.availableAI);
+    if(pick==null){
+      const arr=[...state.availableAI]; pick = Math.max(...arr);
+    }
+    state.baseAI=pick; return pick;
+  }
+
+  if(diff==="expert"){
+    // 後攻（質問者がAIのとき＝aiIsStarter=falseのターン）は大きめ、ただし3倍数奇数は小さめ
+    // 先攻のときは奇数ランダム。ただし3倍数奇数に限ってはランダムな3倍数奇数を出す。
+    let pick=null;
+    if(aiIsStarter){
+      // 先攻
+      pick = oddsRandom3Multiple(state.availableAI);
+      if(pick==null) pick = oddsRandom(state.availableAI);
+      if(pick==null){ const arr=[...state.availableAI]; pick = pickRandom(arr); }
+    }else{
+      // 後攻
+      pick = oddsLargeExcept3Small(state.availableAI);
+      if(pick==null){ const arr=[...state.availableAI]; pick = Math.max(...arr); }
+    }
+    state.baseAI=pick; return pick;
+  }
+
+  // フォールバック（ありえない）
+  const arr=[...state.availableAI]; const fallback = arr[0]; state.baseAI=fallback; return fallback;
+}
+
+/* ========= 勝率推定（hell用に残置） ========= */
 function estimateWinRate(myPick, oppSet){
   let w=0, d=0, l=0;
   for(const opp of oppSet){
@@ -392,29 +436,15 @@ function pickByWinrate(avail, {aiIsStarter, remain}){
   const opp = (state.oppCandidates.size? state.oppCandidates :
                new Set(Array.from({length:100},(_,i)=>i+1)));
   let cand = [...avail];
-  if(!aiIsStarter && remain>30){
-    const odd = cand.filter(x=>x%2===1);
-    if(odd.length) cand = odd;
-  }
   let best=cand[0], bestS=-1;
   for(const x of cand){
-    const s = estimateWinRate(x, opp);
-    const score = s
-      + (aiIsStarter && ALL_DECOYS.includes(x) ? 0.02 : 0)
-      + (x%2===1 ? 0.005 : 0);
-    if(score>bestS){ bestS=score; best=x; }
+    const s = estimateWinRate(x, opp) + (x%2===1 ? 0.005 : 0);
+    if(s>bestS){ bestS=s; best=x; }
   }
-  const ties = cand.filter(x=>{
-    const s = estimateWinRate(x, opp)
-      + (aiIsStarter && ALL_DECOYS.includes(x) ? 0.02 : 0)
-      + (x%2===1 ? 0.005 : 0);
-    return Math.abs(s-bestS) < 1e-3;
-  });
-  if(ties.length>1) best = ties[Math.floor(Math.random()*ties.length)];
   return best;
 }
 
-/* ========= 汎用集合生成（k点） ========= */
+/* ========= 汎用集合生成 ========= */
 function buildSetFromCandidates(candSet, k){
   const arr = Array.from(candSet).sort((a,b)=>a-b);
   if(arr.length===0) return [];
@@ -427,55 +457,59 @@ function buildSetFromCandidates(candSet, k){
   return [...new Set(picks.filter(Number.isInteger))].slice(0,k);
 }
 
-/* ========= AIの出目ロジック ========= */
-function aiPickNumber(){
+/* ========= AIの質問選択（依頼仕様：ランダム使用） ========= */
+function aiChooseQuestion(){
+  if(state.qLocked) return;
+  if(state.asker!=="ai") return;
+
   const diff = $("#difficulty").value;
 
   if(diff==="hell"){
-    const aiIsStarter = (state.turnStarter==="ai");
-    const pick = pickByWinrate(state.availableAI, {aiIsStarter, remain: state.availableAI.size});
-    state.baseAI = pick; return pick;
+    // 余計な情報は与えない：従来の情報系優先
+    const cand = (state.oppCandidates.size? state.oppCandidates : new Set(Array.from({length:100},(_,i)=>i+1)));
+    const qCandidates = ["three","five","four","eight","six"];
+    let bestQ = "three", bestScore = -Infinity;
+    for(const q of qCandidates){ const score = splitScoreForQuestion(q, cand); if(score>bestScore){ bestScore=score; bestQ=q; } }
+    state.qKey = bestQ; state.qAsker = "ai";
+    if(bestQ==="six"){ state.qSetN = buildSetFromCandidates(cand, QDEF.six.n); log(`<b>AIの質問</b>: シックス（候補: ${state.qSetN.join(", ")})`); }
+    else { log(`<b>AIの質問</b>: ${QLABEL[bestQ]}`); }
+    evaluateQuestionImmediately(); return;
   }
 
-  if(diff==="expert"){
-    const aiIsStarter = (state.turnStarter==="ai");
-    let pick;
-    if(aiIsStarter){
-      if(Math.random()<0.75){ state.lastTactic="decoy"; pick = tactic90Decoy(state.availableAI); }
-      else { state.lastTactic="odd-threat"; pick = tacticOddThreat(state.availableAI); }
-    }else{
-      const remain = state.availableAI.size;
-      const oddExist = [...state.availableAI].some(x=>x%2===1);
-      if(remain>30 && oddExist){ state.lastTactic="odd-threat"; pick = tacticOddThreat(state.availableAI); }
-      else {
-        const r=Math.random();
-        if(oddExist && r<0.7){ state.lastTactic="odd-threat"; pick = tacticOddThreat(state.availableAI); }
-        else if(r<0.85){ state.lastTactic="decoy"; pick = tactic90Decoy(state.availableAI); }
-        else { state.lastTactic="sleepless-hint"; pick = tacticNormal(state.availableAI); }
-      }
-    }
-    state.baseAI = pick; return pick;
-  }
-
-  if(diff==="hard" && isSleeplessPressure()){
-    const choice = pickEvenEscape(state.availableAI);
-    state.lastTactic = "even-escape"; state.baseAI = choice; return choice;
-  }
-
-  let useSleepless=false, useDecoy=false;
-  if(diff==="hard"){
-    const r=Math.random();
-    if(r<0.5) useSleepless=true; else if(r<0.9) useDecoy=true;
+  // easy/normal/hard/expert：ワン〜ナインをランダムに使う
+  const keys = ["one","two","three","four","five","six","seven","eight","nine"];
+  // six のときは候補自動生成
+  state.qKey = pickRandom(keys); state.qAsker="ai";
+  if(state.qKey==="six"){
+    const cand = (state.oppCandidates.size? state.oppCandidates : new Set(Array.from({length:100},(_,i)=>i+1)));
+    state.qSetN = buildSetFromCandidates(cand, QDEF.six.n);
+    log(`<b>AIの質問</b>: シックス（候補: ${state.qSetN.join(", ")})`);
   }else{
-    const base=(diff==="normal")?0.12:0.07;
-    const canStrong = (state.lastTactic!=="sleepless" && state.lastTactic!=="decoy");
-    if(canStrong && Math.random()<base){ if(Math.random()<0.5) useSleepless=true; else useDecoy=true; }
+    log(`<b>AIの質問</b>: ${QLABEL[state.qKey]}`);
   }
-  let choice;
-  if(useSleepless){ choice=tacticSleepless(state.availableAI); state.lastTactic="sleepless"; }
-  else if(useDecoy){ choice=tactic90Decoy(state.availableAI); state.lastTactic="decoy"; }
-  else { choice=tacticNormal(state.availableAI); state.lastTactic="normal"; }
-  state.baseAI = choice; return choice;
+  evaluateQuestionImmediately();
+}
+
+/* ========= splitScoreForQuestion（hell用） ========= */
+function splitScoreForQuestion(qKey, candSet){
+  const def = QDEF[qKey]; if(!def) return -1;
+  if(def.type==="mod5"){
+    const bins=[0,0,0,0,0]; for(const x of candSet){ bins[((x%5)+5)%5]++; }
+    return -Math.max(...bins);
+  }
+  if(def.type==="mod4"){
+    const bins=[0,0,0,0]; for(const x of candSet){ bins[((x%4)+4)%4]++; }
+    return -Math.max(...bins);
+  }
+  if(def.type==="setN"){
+    const set = new Set(buildSetFromCandidates(candSet, def.n));
+    let yes=0, no=0; for(const x of candSet){ if(set.has(x)) yes++; else no++; }
+    return -Math.max(yes,no);
+  }
+  if(def.type==="yn"){
+    let yes=0; for(const x of candSet){ if(def.fn(x)) yes++; } const no=candSet.size-yes; return -Math.max(yes,no);
+  }
+  return -Infinity;
 }
 
 /* ========= 即時回答・効果適用 ========= */
@@ -484,8 +518,8 @@ function evaluateQuestionImmediately(){
   const asker = state.qAsker; if(!asker) return;
 
   const def = QDEF[state.qKey];
-  const target = (asker==="ai") ? state.pendingPL : state.pendingAI; // 相手の数字（質問対象）
-  const selfNum = (asker==="ai") ? state.pendingAI : state.pendingPL; // 自分の数字（自己操作用）
+  const target = (asker==="ai") ? state.pendingPL : state.pendingAI;
+  const selfNum = (asker==="ai") ? state.pendingAI : state.pendingPL;
 
   if(def.type==="rule"){
     log(`→ ルール変更（ワン）は公開時に適用可否を判定`);
@@ -501,24 +535,14 @@ function evaluateQuestionImmediately(){
       if(asker==="ai"){ state.pendingAI = selfNum * 9; log(`<b>AIの権利: ナイン</b> → 自分の数 ×9 = <b>${state.pendingAI}</b>`); }
       else { state.pendingPL = selfNum * 9; log(`<b>あなたの権利: ナイン</b> → 自分の数 ×9 = <b>${state.pendingPL}</b>`); }
     }else if(def.op==="to70s"){
+      // ① 変換は常に成功。② 判定は変身後の値で行う。消費は元カードのみ（cleanupで処理）
       const to = 70 + (selfNum % 10);
-      const avail = (asker==="ai") ? state.availableAI : state.availablePL;
-      if(!avail.has(selfNum)){
-        log(`<b>${asker==="ai"?"AI":"あなた"}の権利: セブン</b> → <b>セブン失敗</b>（変換元が使用済み）<span class="hint"> 質問と数字を選び直してください。</span>`);
-        // 失敗：権利未消費。数字もやり直し。
-        if(asker==="ai"){ state.pendingAI=null; state.baseAI=null; setTimeout(()=>{ state.pendingAI = aiPickNumber(); aiChooseQuestion(); syncRevealButton(); },0); }
-        else { state.pendingPL=null; state.basePL=null; renderGrid(); }
-        state.qKey = null; state.qLocked = false; state.qEvaluated = false; clearQChosen();
-        setQuestionUIEnabled(state.asker==="player"); syncRevealButton(); return;
-      }else if(!avail.has(to)){
-        log(`<b>${asker==="ai"?"AI":"あなた"}の権利: セブン</b> → <b>セブン失敗</b>（変換先 ${to} は使用済み）<span class="hint"> 質問と数字を選び直してください。</span>`);
-        if(asker==="ai"){ state.pendingAI=null; state.baseAI=null; setTimeout(()=>{ state.pendingAI = aiPickNumber(); aiChooseQuestion(); syncRevealButton(); },0); }
-        else { state.pendingPL=null; state.basePL=null; renderGrid(); }
-        state.qKey = null; state.qLocked = false; state.qEvaluated = false; clearQChosen();
-        setQuestionUIEnabled(state.asker==="player"); syncRevealButton(); return;
+      if(asker==="ai"){
+        state.pendingAI = to;
+        log(`<b>AIの権利: セブン</b> → <b>${selfNum}</b> を <b>${to}</b> に変更（消費は元の ${selfNum} のみ）`);
       }else{
-        if(asker==="ai"){ state.pendingAI = to; log(`<b>AIの権利: セブン</b> → <b>${selfNum}</b> を <b>${to}</b> に変更（消費は元の ${selfNum} のみ）`); }
-        else { state.pendingPL = to; log(`<b>あなたの権利: セブン</b> → <b>${selfNum}</b> を <b>${to}</b> に変更（消費は元の ${selfNum} のみ）`); }
+        state.pendingPL = to;
+        log(`<b>あなたの権利: セブン</b> → <b>${selfNum}</b> を <b>${to}</b> に変更（消費は元の ${selfNum} のみ）`);
       }
     }
     state.qEvaluated = true; state.qLocked = true; setQuestionUIEnabled(state.asker==="player");
@@ -569,10 +593,10 @@ function evaluateQuestionImmediately(){
 
   if(def.type==="setN"){
     if(asker==="player" && (!state.qSetN || state.qSetN.length===0)){
-      return; // 入力待ち
+      return;
     }
     let set = new Set(state.qSetN);
-    if(asker==="ai"){ // AIは最適化した6候補を自動生成
+    if(asker==="ai"){
       const cand = (state.oppCandidates.size? state.oppCandidates : new Set(Array.from({length:100},(_,i)=>i+1)));
       const auto = buildSetFromCandidates(cand, QDEF.six.n);
       set = new Set(auto); state.qSetN = auto;
@@ -622,71 +646,6 @@ setInput.addEventListener("change", ()=>{
   syncRevealButton();
 });
 
-/* ========= AIの質問選択 ========= */
-function splitScoreForQuestion(qKey, candSet){
-  const def = QDEF[qKey]; if(!def) return -1;
-  if(def.type==="mod5"){
-    const bins=[0,0,0,0,0]; for(const x of candSet){ bins[((x%5)+5)%5]++; }
-    return -Math.max(...bins);
-  }
-  if(def.type==="mod4"){
-    const bins=[0,0,0,0]; for(const x of candSet){ bins[((x%4)+4)%4]++; }
-    return -Math.max(...bins);
-  }
-  if(def.type==="setN"){
-    const set = new Set(buildSetFromCandidates(candSet, def.n));
-    let yes=0, no=0; for(const x of candSet){ if(set.has(x)) yes++; else no++; }
-    return -Math.max(yes,no);
-  }
-  if(def.type==="yn"){
-    let yes=0; for(const x of candSet){ if(def.fn(x)) yes++; } const no=candSet.size-yes; return -Math.max(yes,no);
-  }
-  if(def.type==="self" || qKey==="one"){ return -Infinity; }
-  return -Infinity;
-}
-function aiChooseQuestion(){
-  if(state.qLocked) return;
-  const diff = $("#difficulty").value;
-
-  if(diff==="hell" && state.asker==="ai"){
-    const cand = (state.oppCandidates.size? state.oppCandidates : new Set(Array.from({length:100},(_,i)=>i+1)));
-    const qCandidates = ["three","five","four","eight","six"]; // 情報系を優先
-    let bestQ = "three", bestScore = -Infinity;
-    for(const q of qCandidates){ const score = splitScoreForQuestion(q, cand); if(score>bestScore){ bestScore=score; bestQ=q; } }
-    state.qKey = bestQ; state.qAsker = "ai";
-    if(bestQ==="six"){ state.qSetN = buildSetFromCandidates(cand, QDEF.six.n); log(`<b>AIの質問</b>: シックス（候補: ${state.qSetN.join(", ")})`); }
-    else { log(`<b>AIの質問</b>: ${QLABEL[bestQ]}`); }
-    evaluateQuestionImmediately(); return;
-  }
-
-  if(diff==="expert" && state.asker==="ai"){
-    state.qKey = (Math.random() < 0.7) ? "three" : "four"; // mod4も使う
-    state.qAsker = "ai";
-    log(`<b>AIの質問</b>: ${QLABEL[state.qKey]}`);
-    evaluateQuestionImmediately(); return;
-  }
-
-  const order = [];
-  const rnd=Math.random();
-  if(rnd<0.15) order.push("five");
-  else if(rnd<0.3) order.push("four");
-  order.push("two","three","six","seven","eight","nine","one");
-
-  for(const k of order){
-    state.qKey = k; state.qAsker = "ai";
-    if(k==="six"){ 
-      state.qSetN = buildSetFromCandidates(state.oppCandidates, QDEF.six.n); 
-      if(state.qSetN.length===0){ continue; }
-      log(`<b>AIの質問</b>: シックス（候補: ${state.qSetN.join(", ")})`);
-    }else{
-      log(`<b>AIの質問</b>: ${QLABEL[k]}`);
-    }
-    evaluateQuestionImmediately(); return;
-  }
-
-  state.qKey = "three"; state.qAsker = "ai"; log(`<b>AIの質問</b>: ${QLABEL[state.qKey]}`); evaluateQuestionImmediately();
-}
-
 /* ========= ターン制御 ========= */
 function nextTurn(){
   state.turn += 1; $("#turnNow").textContent = String(state.turn);
@@ -721,10 +680,9 @@ function onPlayerPickedMaybeAdvance(){
   if(state.pendingPL==null){ syncRevealButton(); return; }
   if(state.pendingAI==null){ state.pendingAI = aiPickNumber(); }
 
-  // ★ 追加：AIが質問者なら、ここでAIの質問を自動確定
   if(state.asker === "ai" && !state.qKey && !state.revealed){
     state.qAsker = "ai";
-    aiChooseQuestion();           // 中で evaluateQuestionImmediately() まで走る
+    aiChooseQuestion();
   }
 
   syncRevealButton();
@@ -741,7 +699,6 @@ function revealAndJudge(){
   }
   if(!state.qEvaluated) evaluateQuestionImmediately();
 
-  // セブン失敗などで質問未確定になった場合は公開を中断してやり直し
   if(!state.qKey || !state.qEvaluated){
     log(`<span class="hint">※ 権利が未確定のため、公開を中断しました。質問と数字を選び直してください。</span>`);
     setQuestionUIEnabled(state.asker==="player");
@@ -751,10 +708,10 @@ function revealAndJudge(){
 
   state.qLocked = true; setQuestionUIEnabled(state.asker==="player");
 
-  const ai = state.pendingAI, pl = state.pendingPL;
+  const ai = state.pendingAI, pl = state.pendingPL; // ② 変身後の最終値で判定
   let res="Draw";
 
-  if(state.qKey==="one"){ // ワン特例
+  if(state.qKey==="one"){
     const askerIsPlayer = (state.qAsker==="player");
     const askerNum = askerIsPlayer ? pl : ai;
     const otherNum = askerIsPlayer ? ai : pl;
@@ -797,7 +754,7 @@ function maybeFinishByTarget(){
 }
 
 function cleanup(){
-  // 消費するのは「元カード」（base*）。自己操作で値が変わっていても元を削除する。
+  // 消費するのは「元カード」
   const consumePL = (state.basePL!=null) ? state.basePL : state.pendingPL;
   const consumeAI = (state.baseAI!=null) ? state.baseAI : state.pendingAI;
 
