@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>ハンドレッド / Hundred ver 3.1.13-custom</title>
+<title>ハンドレッド / Hundred ver 3.1.16-custom</title>
 <style>
   :root{
     --bg:#0e1a12; --bg2:#122216; --panel:#152a1b; --accent:#35c46e; --accent-2:#2aa55b;
@@ -60,7 +60,7 @@
 </head>
 <body>
 <header>
-  <h1>ハンドレッド / Hundred ver 3.1.13-custom</h1>
+  <h1>ハンドレッド / Hundred ver 3.1.16-custom</h1>
 </header>
 
 <main>
@@ -365,46 +365,7 @@ function descSelf(op){
   return "";
 }
 
-/* ========= AI: 先手確定（AIが先手のとき、ターン開始時に選んで保持） ========= */
-function aiPickStarterAndHold(){
-  const diff = $("#difficulty").value;
-  let pick=null;
-
-  if(diff==="expert"){
-    pick = pickOddGE(state.availableAI, 70)
-        ?? firstAvailable(state.availableAI, x=>x%2===1 && x%3===0 && x<50)
-        ?? oddsLargePref(state.availableAI)
-        ?? oddsSmallPref(state.availableAI);
-  }else if(diff==="hell"){
-    if(Math.random()<0.15){
-      const ev90 = evensFrom(state.availableAI).filter(x=>x>=90).sort((a,b)=>b-a);
-      if(ev90.length) pick = ev90[0];
-    }
-    if(pick==null){
-      const ev80 = evensFrom(state.availableAI).filter(x=>x>=80).sort((a,b)=>b-a);
-      if(ev80.length) pick = ev80[0];
-    }
-    if(pick==null){
-      pick = pickOddGE(state.availableAI, 70)
-          ?? firstAvailable(state.availableAI, x=>x%2===1 && x%3===0 && x<50)
-          ?? oddsLargePref(state.availableAI)
-          ?? oddsSmallPref(state.availableAI);
-    }
-  }else if(diff==="easy"){
-    const o=oddsFrom(state.availableAI);
-    pick = o.length? pickRandom(o) : anyFrom(state.availableAI);
-  }else if(diff==="normal"){
-    pick = oddsLargePref(state.availableAI) ?? anyFrom(state.availableAI);
-  }else if(diff==="hard"){
-    pick = oddsLargeExcept3Small(state.availableAI) ?? anyFrom(state.availableAI);
-  }
-
-  if(pick==null) pick = anyFrom(state.availableAI); // 最終フォールバック
-  state.selAI = pick; state.baseAI = pick; state.aiStarterLocked = true;
-  updateBadges();
-}
-
-/* ========= Expert後攻の数字選択ポリシー（関数化） ========= */
+/* ========= Expert後攻の数字選択ポリシー ========= */
 function pickByExpertFollowerPolicy(avail){
   const largeOdd = ()=> oddsLargePref(avail) ?? oddsSmallPref(avail);
   const smallOdd = ()=> oddsSmallPref(avail) ?? oddsLargePref(avail);
@@ -460,6 +421,73 @@ function pickByExpertFollowerPolicy(avail){
   return pick ?? anyFrom(avail);
 }
 
+/* ========= AI: 先手確定（AIが先手のとき、ターン開始時に選んで保持） ========= */
+function aiPickStarterAndHold(){
+  const diff = $("#difficulty").value;
+  let pick=null;
+
+  if(diff==="expert"){
+    pick = pickOddGE(state.availableAI, 70)
+        ?? firstAvailable(state.availableAI, x=>x%2===1 && x%3===0 && x<50)
+        ?? oddsLargePref(state.availableAI)
+        ?? oddsSmallPref(state.availableAI);
+
+  }else if(diff==="hell"){
+    // 56%: 大きい奇数(99..71) / 28%: 小さい3の倍数奇数(45..3) / 16%: 大きい偶数
+    const r = Math.random();
+    const avail = state.availableAI;
+
+    const pickLargeOdd = () => {
+      const arr = [...avail].filter(x=>x%2===1 && x>=71 && x<=99).sort((a,b)=>b-a);
+      return arr[0] ?? null;
+    };
+    const pickSmallOddMultipleOf3 = () => {
+      const arr = [...avail].filter(x=>x%2===1 && x%3===0 && x>=3 && x<=45).sort((a,b)=>a-b);
+      return arr[0] ?? null;
+    };
+    const pickLargeEven = () => {
+      const ev90 = [...avail].filter(x=>x%2===0 && x>=90).sort((a,b)=>b-a);
+      if(ev90.length) return ev90[0];
+      const ev80 = [...avail].filter(x=>x%2===0 && x>=80).sort((a,b)=>b-a);
+      return ev80[0] ?? null;
+    };
+
+    if(r < 0.56){
+      pick = pickLargeOdd();
+      if(!pick) pick = pickSmallOddMultipleOf3();
+      if(!pick) pick = pickLargeEven();
+    }else if(r < 0.56 + 0.28){
+      pick = pickSmallOddMultipleOf3();
+      if(!pick) pick = pickLargeOdd();
+      if(!pick) pick = pickLargeEven();
+    }else{
+      pick = pickLargeEven();
+      if(!pick) pick = pickLargeOdd();
+      if(!pick) pick = pickSmallOddMultipleOf3();
+    }
+
+    // さらに保険のフォールバック
+    if(!pick) pick = pickOddGE(avail, 70)
+                 ?? firstAvailable(avail, x=>x%2===1 && x%3===0 && x<50)
+                 ?? oddsLargePref(avail)
+                 ?? oddsSmallPref(avail);
+
+  }else if(diff==="easy"){
+    const o=oddsFrom(state.availableAI);
+    pick = o.length? pickRandom(o) : anyFrom(state.availableAI);
+
+  }else if(diff==="normal"){
+    pick = oddsLargePref(state.availableAI) ?? anyFrom(state.availableAI);
+
+  }else if(diff==="hard"){
+    pick = oddsLargeExcept3Small(state.availableAI) ?? anyFrom(state.availableAI);
+  }
+
+  if(pick==null) pick = anyFrom(state.availableAI); // 最終フォールバック
+  state.selAI = pick; state.baseAI = pick; state.aiStarterLocked = true;
+  updateBadges();
+}
+
 /* ========= AI: 後攻のライフナイン選択（公開直前に一気にやる） ========= */
 function aiChooseQuestionAndLockAfterPlayerStarterLocked(){
   const diff = $("#difficulty").value;
@@ -507,7 +535,7 @@ function aiPickFollowerAndLockByPolicy(){
   if(diff==="expert"){
     pick = pickByExpertFollowerPolicy(avail);
   }else if(diff==="hell"){
-    // 後攻時の数字選択は expert と同じ方針（再帰禁止）
+    // 後攻時の数字選択は expert と同じ方針
     pick = pickByExpertFollowerPolicy(avail);
   }else if(diff==="easy"){
     const o=oddsFrom(avail);
@@ -613,7 +641,6 @@ function revealAndJudge(){
     if(state.basePL==null){ state.basePL = state.selPL; }
     if(!state.qLocked || state.qAsker!=="ai"){ aiChooseQuestionAndLockAfterPlayerStarterLocked(); }
     if(state.baseAI==null){
-      // 念押しフォールバック
       aiPickFollowerAndLockByPolicy();
     }
     if(state.baseAI==null){ alert("AIの手が確定できませんでした。"); return; }
