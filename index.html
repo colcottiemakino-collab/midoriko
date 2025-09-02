@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>ハンドレッド / Hundred ver 3.1.16-custom</title>
+<title>ハンドレッド / Hundred ver 3.1.17-custom</title>
 <style>
   :root{
     --bg:#0e1a12; --bg2:#122216; --panel:#152a1b; --accent:#35c46e; --accent-2:#2aa55b;
@@ -60,7 +60,7 @@
 </head>
 <body>
 <header>
-  <h1>ハンドレッド / Hundred ver 3.1.16-custom</h1>
+  <h1>ハンドレッド / Hundred ver 3.1.17-custom</h1>
 </header>
 
 <main>
@@ -456,7 +456,7 @@ function aiPickStarterAndHold(){
       pick = pickLargeOdd();
       if(!pick) pick = pickSmallOddMultipleOf3();
       if(!pick) pick = pickLargeEven();
-    }else if(r < 0.56 + 0.28){
+    }else if(r < 0.84){
       pick = pickSmallOddMultipleOf3();
       if(!pick) pick = pickLargeOdd();
       if(!pick) pick = pickLargeEven();
@@ -466,7 +466,7 @@ function aiPickStarterAndHold(){
       if(!pick) pick = pickSmallOddMultipleOf3();
     }
 
-    // さらに保険のフォールバック
+    // 保険のフォールバック
     if(!pick) pick = pickOddGE(avail, 70)
                  ?? firstAvailable(avail, x=>x%2===1 && x%3===0 && x<50)
                  ?? oddsLargePref(avail)
@@ -492,10 +492,25 @@ function aiPickStarterAndHold(){
 function aiChooseQuestionAndLockAfterPlayerStarterLocked(){
   const diff = $("#difficulty").value;
   let key=null;
+
   if(diff==="hell"){
+    // 最初の10ターンはセブン封印（turn 1〜10）。11以降で解禁。
+    const includeSeven = (state.turn >= 11);
     const base = ["two","three","five","nine"];
-    const pool = (state.turn > 10) ? [...base,"seven"] : base;
+    const pool = includeSeven ? [...base,"seven"] : base;
+
     key = pickRandom(pool);
+
+    // 二重ガード：禁止ターンに seven が来たら再抽選（最大5回）。ダメなら three。
+    if(key==="seven" && !includeSeven){
+      let tries=0;
+      while(key==="seven" && tries<5){
+        key = pickRandom(base);
+        tries++;
+      }
+      if(key==="seven") key="three";
+    }
+
   }else if(diff==="expert"){
     let pool = ["one","two","three","four","five","six","seven","eight","nine"];
     const has157 = [1,5,7].some(x=>state.availableAI.has(x));
@@ -505,6 +520,7 @@ function aiChooseQuestionAndLockAfterPlayerStarterLocked(){
     const pool = ["one","two","three","four","five","six","seven","eight","nine"];
     key = pickRandom(pool);
   }
+
   state.qKey = key; state.qAsker = "ai"; state.qLocked = true;
 
   // 質問系はAIだけに即結果（ログには出さない）
