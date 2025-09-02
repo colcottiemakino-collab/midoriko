@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>ハンドレッド / Hundred ver 3.1.9-custom</title>
+<title>ハンドレッド / Hundred ver 3.1.11-custom</title>
 <style>
   :root{
     --bg:#0e1a12; --bg2:#122216; --panel:#152a1b; --accent:#35c46e; --accent-2:#2aa55b;
@@ -60,7 +60,7 @@
 </head>
 <body>
 <header>
-  <h1>ハンドレッド / Hundred ver 3.1.9-custom</h1>
+  <h1>ハンドレッド / Hundred ver 3.1.11-custom</h1>
 </header>
 
 <main>
@@ -108,7 +108,6 @@
     </div>
 
     <div class="row" style="gap:12px">
-      <button id="btnLock" disabled>あなたの数字を<b>確定</b></button>
       <span class="badge" id="badgePL">あなた: 未確定</span>
       <span class="badge" id="badgeAI">AI: 未確定</span>
     </div>
@@ -195,67 +194,6 @@
 セブン  あなたの数字の「10 の位」を７にする（例: 53→73）。変換先が使用済みでも使える。
 エイト  相手が80以上かどうかを聞ける（Yes/No）
 ナイン  あなたの選んだ自分の数を９倍にする（上限なし）。変換先が使用済みでも使える。
-
-【ヒント】
-当然ですが、奇数を出しましょう。偶数は上級者向けです。
-そして後攻側では高確率で勝てる強い数字を使いましょう。
-
-このゲームは後攻側に強力なライフナインが存在するので、圧倒的に後攻有利です。
-従って勝って当然の後攻側で負けると、一気に負けに近づきます。
-逆に圧倒的不利な先行側で１本取ると、一気に勝利に近づきます。
-一度使った数字が再利用できない以上、後攻では絶対勝てるつよい数字、
-先攻では負けてもいい（けどあわよくば勝てる）弱い数字を使うことになります。
-
-ワン
-最も弱く、使う機会はほぼない、最終盤用のライフナインです。
-このゲームはまれに長期戦になり、そのころには詰将棋のように回避不能な敗北があり得ますが、
-それを打開できる可能性があります。
-
-ツー
-いつでも使えますが、中盤以降に強いです。お互い目ぼしい数字が限られてきた場合の小競り合いに使います。
-また、「３の倍数を避けたい」ときとか、逆に「あえて13を３の倍数の15にしたい」ときにも便利です。
-
-スリー
-応用ルール(2)に最も踏み込めるきわめて強力なライフナインで、常に強いですが特に中盤以降は最強格の１つです。
-序盤の立ち回りでリードし、手持ちの数字が相手よりいい感じの時に横綱相撲をするのに適しています。
-これは「スリープレス定石」と呼ばれる、基本戦術の１つです。
-
-フォー
-基本的にファイブの（かなりの）下位互換であり、サーチが雑で相手の数字をうまく限定できません。
-ファイブに唯一圧倒的に勝る点として、基本戦術の１つ「偶数デコイ」を発見できる点があります。
-偶数を見つけたら大金星で、手元の不要な奇数カードを消費しつつ必勝です。
-相手が先攻側で偶数デコイをよく使うタイプだったり、終盤になって偶数デコイを使わざるを得ない状況で
-ファイブを上回る可能性が出てきます。
-
-ファイブ
-序盤から終盤までずっと強い、きわめて強力なライフナインです。
-相手の数字を相当限定することができます。
-余りは０・１・２・３・４になりますが、偶数が負ける以上、
-それは下一桁が５・１・７・３・９であるのとほぼ同じ意味になります。
-例えば余りが０であるなら、警戒すべきは95・85・75あたりです。
-ただしフォーと違い、捨て駒の偶数デコイを使った作戦に弱い一面があります。
-
-シックス
-中盤以降で真価を発揮します。序盤に出番はありません。
-絶対に通したい数字カードがある場合の安全確認に使用します。
-「最大６つ」なので、ノイズが嫌な場合は同じ数字を複数回指定するなどして減らすことも可能です。
-
-セブン
-序盤はあまり期待できませんが、90代、80代の減ってくる中盤以降から猛威を振るいはじめます。
-ほぼ出番のないはずの17・19・29・37・47・49などがすべて結構強い７７や７９に化けます。
-状況次第でたまに必要な「中途半端にデカい３の倍数」の75を作れるのも魅力です。
-
-エイト
-相手の戦術によってはかなり強力な、広範囲をサーチできる強力なライフナインです。
-エイト→NOなら、83以上で必勝です。（81など３の倍数は負けることもあるので注意）
-一方、100などの偶数デコイに引っかかってしまう弱点があるのと、
-先攻速攻型の相手には、エイト→YESだった場合はほとんどノーヒントで何かを出す羽目になります。
-
-ナイン
-序盤から終盤まで常に使える超強力なライフナインです。
-９倍になるということは13以上を出せば99を超え、基本絶対勝てることになりますが、
-９の倍数＝３の倍数なので、相手が３の倍数だった場合は逆に絶対に負けます。
-小細工として、１に使い９にして相手の３の倍数を狩る方法も一応あります。
 </pre>
 </section>
 
@@ -287,15 +225,15 @@ const state = {
   availablePL: new Set(),
   availableAI: new Set(),
 
-  // プレイヤーの選択とロック
-  selPL: null, lockedPL: false, basePL: null,
-  // AIの選択とロック
-  selAI: null, lockedAI: false, baseAI: null,
+  // プレイヤーの選択（ロックは公開時に扱う）
+  selPL: null, basePL: null,
+  // AIの選択（先手AIはターン開始時に基底確定）
+  selAI: null, baseAI: null, aiStarterLocked: false,
 
   // 質問（誰が・何を・結果は？）
   qKey: null, qAsker: null, qLocked: false,
   qSetN: [],           // player 用
-  qAnswerPrivate: null,// 即時に“質問者だけ”が見る結果（公開時に改めて開示）
+  qAnswerPrivate: null,// 質問者だけが見る結果（公開時に再開示）
   qAIAutoSet: [],      // AI の six 用
 
   // 公開・スコア
@@ -315,8 +253,20 @@ function log(line){ const div=document.createElement("div"); div.innerHTML=line;
 function numArrayDesc(set){ return Array.from(set).sort((a,b)=>b-a); }
 function renderLists(){ if(listAI) listAI.textContent = numArrayDesc(state.availableAI).join(", "); }
 function updateBadges(){
-  badgePL.textContent = `あなた: ${state.lockedPL ? `確定(${state.basePL})` : (state.selPL? `選択中(${state.selPL})` : "未確定")}`;
-  badgeAI.textContent = `AI: ${state.lockedAI ? `確定(${state.baseAI})` : (state.selAI? `選択中(${state.selAI})` : "未確定")}`;
+  // Player: 数字は見せてOK（自分の画面だし）
+  const plText = state.basePL!=null
+    ? `確定(${state.basePL})`
+    : (state.selPL ? `選択中(${state.selPL})` : "未確定");
+  badgePL.textContent = `あなた: ${plText}`;
+
+  // AI: 公開までは数値を一切見せない
+  let aiText = "未確定";
+  if(state.revealed){
+    aiText = state.baseAI!=null ? `確定(${state.baseAI})` : (state.selAI?`選択中(${state.selAI})`:"未確定");
+  }else{
+    if(state.baseAI!=null || state.selAI!=null) aiText = (state.baseAI!=null? "確定(非公開)" : "選択中(非公開)");
+  }
+  badgeAI.textContent = `AI: ${aiText}`;
 }
 function renderGrid(){
   gridEl.innerHTML="";
@@ -327,7 +277,7 @@ function renderGrid(){
       cell.classList.add("used");
     }else{
       cell.addEventListener("click", ()=>{
-        if(state.revealed || state.lockedPL) return;    // 確定後は変更不可
+        if(state.revealed) return;
         state.selPL = (state.selPL===n ? null : n);
         Array.from(gridEl.children).forEach(c=>c.classList.remove("selected"));
         if(state.selPL===n) cell.classList.add("selected");
@@ -344,8 +294,8 @@ function resetGame(){
   state.availablePL = new Set(Array.from({length:100},(_,i)=>i+1));
   state.availableAI = new Set(Array.from({length:100},(_,i)=>i+1));
 
-  state.selPL=null; state.lockedPL=false; state.basePL=null;
-  state.selAI=null; state.lockedAI=false; state.baseAI=null;
+  state.selPL=null; state.basePL=null;
+  state.selAI=null; state.baseAI=null; state.aiStarterLocked=false;
 
   state.qKey=null; state.qAsker=null; state.qLocked=false; state.qSetN=[]; state.qAnswerPrivate=null; state.qAIAutoSet=[];
   state.revealed=false; state.history={player:[], ai:[]};
@@ -360,7 +310,7 @@ function resetGame(){
 
   $("#turnNow").textContent = "0";
   logEl.innerHTML="";
-  statusEl.textContent = "対局開始。手順: ①先攻確定 → ②後攻ライフナイン → ③後攻確定 → ④公開";
+  statusEl.textContent = "対局開始。ボタンは『同時公開 → 判定』のみ。押した瞬間に未確定を自動処理して公開。";
   renderGrid(); renderLists(); updateScore(); updateBadges();
   nextTurn();
 }
@@ -420,8 +370,8 @@ function descSelf(op){
   return "";
 }
 
-/* ========= AI: 先攻の確定（①） ========= */
-function aiPickStarterAndLock(){
+/* ========= AI: 先手確定（AIが先手のとき、ターン開始時に選んで保持） ========= */
+function aiPickStarterAndHold(){
   const diff = $("#difficulty").value;
   let pick=null;
 
@@ -456,14 +406,13 @@ function aiPickStarterAndLock(){
     pick = Math.max(...arrFrom(state.availableAI));
   }
 
-  state.selAI = pick; state.baseAI = pick; state.lockedAI = true;
+  state.selAI = pick; state.baseAI = pick; state.aiStarterLocked = true;
   updateBadges();
 }
 
-/* ========= AI: 後攻のライフナイン選択（②）と数字確定（③） ========= */
-function aiChooseQuestionAfterStarterLocked(){
+/* ========= AI: 後攻のライフナイン選択（公開直前に一気にやる） ========= */
+function aiChooseQuestionAndLockAfterPlayerStarterLocked(){
   const diff = $("#difficulty").value;
-  // 選択可能プール
   let key=null;
   if(diff==="hell"){
     const base = ["two","three","five","nine"];
@@ -480,16 +429,15 @@ function aiChooseQuestionAfterStarterLocked(){
   }
   state.qKey = key; state.qAsker = "ai"; state.qLocked = true;
 
-  // 質問系は「AIだけが見る」即時回答（ログに出さない）
-  state.qAnswerPrivate = null;
+  // 質問系はAIだけに即結果（ログには出さない）
+  state.qAnswerPrivate = null; state.qAIAutoSet=[];
   if(["three","four","five","six","eight"].includes(key)){
-    const target = state.basePL; // 先攻の基底数字（ロック済）
+    const target = state.basePL; // 先攻プレイヤーの確定値（公開直前にロックされる）
     if(key==="three"){ state.qAnswerPrivate = (target%3===0); }
     if(key==="four"){  state.qAnswerPrivate = ((target%4)+4)%4; }
     if(key==="five"){  state.qAnswerPrivate = ((target%5)+5)%5; }
     if(key==="eight"){ state.qAnswerPrivate = (target>=80); }
     if(key==="six"){
-      // 簡易オート集合（公開時に開示）
       const all = Array.from({length:100},(_,i)=>i+1);
       const picks=[]; for(let i=1;i<=6;i++){ const p=i/7; picks.push(all[Math.floor(all.length*p)]); }
       state.qAIAutoSet = [...new Set(picks)];
@@ -497,7 +445,7 @@ function aiChooseQuestionAfterStarterLocked(){
     }
   }
 
-  // ③ 数字確定：AIは回答や選択に基づいて最終“基底数字”を決めてロック
+  // 数字確定（AIは回答に基づき基底数字を決める）
   aiPickFollowerAndLockByPolicy();
 }
 
@@ -510,7 +458,6 @@ function aiPickFollowerAndLockByPolicy(){
   const smallOdd = ()=> oddsSmallPref(avail) ?? oddsLargePref(avail);
 
   if(diff==="expert"){
-    // 後攻の方針（あなたが出した仕様に準拠）
     switch(state.qKey){
       case "one": {
         const pool=[1,5,7].filter(x=>avail.has(x)); pick = pool.length? pickRandom(pool): largeOdd(); break;
@@ -559,13 +506,9 @@ function aiPickFollowerAndLockByPolicy(){
       default: pick = largeOdd();
     }
   }else if(diff==="hell"){
-    // 後攻時: 数字の出し方は expert と同じ（仕様）
-    state.difficulty = "expert";
-    aiPickFollowerAndLockByPolicy();
-    state.difficulty = "hell";
-    return;
+    // 後攻時: 数字の出し方は expert と同じ
+    const save=state.difficulty; state.difficulty="expert"; aiPickFollowerAndLockByPolicy(); state.difficulty=save; return;
   }else{
-    // easy/normal/hard: 既存方針で十分
     if(diff==="easy"){
       const o=oddsFrom(avail);
       pick = o.length? pickRandom(o): pickRandom(arrFrom(avail));
@@ -576,64 +519,24 @@ function aiPickFollowerAndLockByPolicy(){
     }
   }
 
-  state.selAI = pick; state.baseAI = pick; state.lockedAI = true;
-  updateBadges(); updateControls();
-}
-
-/* ========= プレイヤー操作 ========= */
-function updateControls(){
-  // 質問UI有効条件: 質問者=player かつ 先攻（=相手）が確定済み かつ 質問未ロック
-  const qEnable = (state.asker==="player" && state.lockedAI && !state.qLocked && !state.revealed);
-  document.querySelectorAll(".qbtn").forEach(b=>b.disabled = !qEnable);
-  setInput.disabled = !(qEnable && state.qKey==="six");
-
-  // Lockボタン表示条件:
-  // ①先攻=player かつ 未確定 → 常に押せる（質問はAIが後でやる）
-  // ③後攻=player → 先にライフナイン選択が必要（qLocked）、その後押せる
-  let canLock = false;
-  if(!state.lockedPL && !state.revealed){
-    if(state.turnStarter==="player"){ canLock = !!state.selPL; }
-    else{ // 後攻=player
-      canLock = !!state.selPL && state.qLocked && state.qAsker==="player";
-    }
-  }
-  $("#btnLock").disabled = !canLock;
-
-  // Reveal: 両者確定＋質問選択済（質問者がAIなら内部で選ぶので既に qLocked）
-  const canReveal = state.lockedPL && state.lockedAI && state.qLocked && !state.revealed;
-  $("#btnReveal").disabled = !canReveal;
-
-  // バッジ
+  state.selAI = pick; state.baseAI = pick;
   updateBadges();
 }
 
-function playerLockNumber(){
-  if(state.lockedPL || state.revealed) return;
-  if(state.selPL==null){ alert("数字を選んでください。"); return; }
-  // ① or ③ の確定
-  state.basePL = state.selPL; state.lockedPL = true;
-  log(`<b>あなたの数字 確定</b>: ${state.basePL}`);
-
-  // もし先攻=player なら、②: AIがライフナインを選び、③: AIが数字確定へ
-  if(state.turnStarter==="player"){
-    aiChooseQuestionAfterStarterLocked();
-    log(`<span class="hint">AIはライフナインを選択済（内容は公開時に開示）</span>`);
-  }
-  updateControls();
-}
-
-/* ========= プレイヤーのライフナイン選択（②） ========= */
+/* ========= プレイヤーUI（後攻時の質問） ========= */
 document.querySelectorAll(".qbtn").forEach(btn=>{
   btn.addEventListener("click", ()=>{
     if(state.asker!=="player" || state.qLocked || state.revealed) return;
-    if(!state.lockedAI){ return; } // 先攻が確定していなければ選べない
+    // 先攻=AIが確定している必要（ターン開始時に確定済み）
+    if(!state.aiStarterLocked){ return; }
     document.querySelectorAll(".qbtn").forEach(b=>b.classList.remove("chosen"));
     btn.classList.add("chosen");
     state.qKey = btn.dataset.q; state.qAsker = "player";
 
     // six の集合入力だけ前もって必要
     if(state.qKey==="six"){
-      state.qSetN=[]; setInput.value=""; setInput.disabled=false;
+      state.qSetN=[]; setInput.value=""; setInput.disabled=true; // 入力はchangeで処理、ここでは有効化は直後
+      setInput.disabled=false;
       log(`<b>あなたの権利</b>: シックスを選択。集合を入力してください。`);
     }else{
       // 質問者本人にだけ即時結果（ログ表示OK）
@@ -646,7 +549,7 @@ document.querySelectorAll(".qbtn").forEach(btn=>{
 function evalPlayerQuestionPreview(){
   const def = QDEF[state.qKey];
   if(!def) return;
-  const target = state.baseAI; // 先攻の確定値
+  const target = state.baseAI; // 先攻AIの確定値
   if(def.type==="yn"){
     const truth = !!def.fn(target);
     state.qAnswerPrivate = truth;
@@ -660,12 +563,10 @@ function evalPlayerQuestionPreview(){
   }else if(def.type==="setN"){
     // six はここでは通らない（集合入力後に処理）
   }else{
-    // self/rule は公開時適用。ここでは選んだ旨だけ。
     log(`<b>あなたの権利</b>: ${QLABEL[state.qKey]} を選択（効果は公開時に適用／相手には非公開）`);
   }
 }
 
-// シックス集合入力 → 即判定（本人のみ表示）→ ライフナイン固定
 setInput.addEventListener("change", ()=>{
   if(state.asker!=="player" || state.qKey!=="six" || state.qLocked || state.revealed) return;
   const vals = setInput.value.trim().split(/\s+/).filter(s=>s.length>0).map(s=>parseInt(s,10)).filter(n=>Number.isInteger(n)&&n>=1&&n<=100);
@@ -692,29 +593,51 @@ function nextTurn(){
   $("#asker").textContent = (state.asker==="player") ? "あなた" : "AI";
 
   // リセット（ターン内）
-  state.selPL=null; state.lockedPL=false; state.basePL=null;
-  state.selAI=null; state.lockedAI=false; state.baseAI=null;
+  state.selPL=null; state.basePL=null;
+  state.selAI=null; state.baseAI=null; state.aiStarterLocked=false;
   state.qKey=null; state.qAsker=null; state.qLocked=false; state.qSetN=[]; state.qAnswerPrivate=null; state.qAIAutoSet=[];
   state.revealed=false;
 
   Array.from(gridEl.children).forEach(c=>c.classList.remove("selected"));
-  updateBadges();
 
   if(state.deuce){ statusEl.textContent = "デュース中（Win by 2）。"; }
   else if(state.turn===1){ statusEl.textContent = `対局開始。先取本数は ${state.winTarget}。`; }
 
-  // ① 先攻確定（AIが先攻なら即確定）
-  if(state.turnStarter==="ai"){ aiPickStarterAndLock(); log(`<span class="hint">AIが先手の数字を確定</span>`); }
+  // 先手がAIならターン開始時にAIの基底を保持
+  if(state.turnStarter==="ai"){ aiPickStarterAndHold(); log(`<span class="hint">AIが先手の数字を決定（非公開）</span>`); }
 
-  renderGrid(); renderLists(); updateControls();
+  renderGrid(); renderLists(); updateBadges(); updateControls();
 }
 
-/* ========= 公開（④） → 判定 → 自動削除 ========= */
+/* ========= 公開（ワンボタンで前処理→公開→判定） ========= */
 function revealAndJudge(){
   if(state.revealed) return;
-  if(!(state.lockedPL && state.lockedAI && state.qLocked)){ alert("両者の数字確定と権利選択が必要です。"); return; }
 
-  // 公開ログ：AIの質問もこのタイミングで初めて内容と結果を開示
+  // 0) プレイヤーの選択必須
+  if(state.selPL==null && state.basePL==null){
+    alert("あなたの数字を選んでください。"); return;
+  }
+
+  // 1) 先手確定の扱い
+  if(state.turnStarter==="player"){
+    // ボタン押下の瞬間に先手プレイヤー確定
+    if(state.basePL==null){ state.basePL = state.selPL; }
+    // 後攻AIはここでライフナイン選択＋回答取得＋数字確定を一気にやる
+    if(!state.qLocked || state.qAsker!=="ai"){ aiChooseQuestionAndLockAfterPlayerStarterLocked(); }
+    if(state.baseAI==null){ alert("AIの手が確定できませんでした。"); return; }
+  }else{
+    // 先手AIはターン開始時に確定済み
+    if(!state.aiStarterLocked){ aiPickStarterAndHold(); }
+    // このターンの質問はプレイヤー側。選択済み必須
+    if(!state.qLocked || state.qAsker!=="player"){
+      alert("あなたのライフナインを選んでください。"); return;
+    }
+    // 後攻プレイヤーの基底確定（今の選択でロック）
+    if(state.basePL==null){ state.basePL = state.selPL; }
+    if(state.basePL==null){ alert("あなたの数字を選んでください。"); return; }
+  }
+
+  // 公開ログ：AIの質問はこのタイミングで開示
   if(state.qAsker==="ai"){
     const def = QDEF[state.qKey];
     if(def.type==="yn"){
@@ -731,21 +654,19 @@ function revealAndJudge(){
       log(`<b>AIの権利: ${QLABEL[state.qKey]}</b>（判定はこれから適用）`);
     }
   }else if(state.qAsker==="player"){
-    // 既にプレビュー済だが、公開時の事実として簡潔に追記
     if(["three","four","five","six","eight"].includes(state.qKey)){
       const shown = (state.qKey==="three"||state.qKey==="eight") ? (state.qAnswerPrivate?'Yes':'No') : state.qAnswerPrivate;
-      const label = (state.qKey==="three"||state.qKey==="eight") ? `<b>${shown}</b>` : `<b>${shown}</b>`;
-      log(`<span class="hint">公開: あなたの${QLABEL[state.qKey]}の結果が相手に開示されました（${label}）</span>`);
+      log(`<span class="hint">公開: あなたの${QLABEL[state.qKey]}の結果が相手に開示されました（<b>${shown}</b>）</span>`);
     }else{
       log(`<span class="hint">公開: あなたが ${QLABEL[state.qKey]} を使ったことが相手に開示されました</span>`);
     }
   }
 
-  // 自己変換はここで初適用してから判定
+  // 2) 自己変換はここで初適用してから判定
   let pl = state.basePL, ai = state.baseAI;
-  const def = QDEF[state.qKey];
+  const def = QDEF[state.qKey] || null;
 
-  if(def.type==="self"){
+  if(def && def.type==="self"){
     if(state.qAsker==="player"){
       pl = applySelfOp(pl, def.op);
       log(`<b>あなたの権利: ${QLABEL[state.qKey]}</b> → 自分の数 ${descSelf(def.op)} = <b>${pl}</b>`);
@@ -753,13 +674,11 @@ function revealAndJudge(){
       ai = applySelfOp(ai, def.op);
       log(`<b>AIの権利: ${QLABEL[state.qKey]}</b> → 自分の数 ${descSelf(def.op)} = <b>${ai}</b>`);
     }
-  }else if(def.type==="rule"){
-    // ワン判定は勝敗で適用
   }
 
-  // 勝敗
+  // 3) 勝敗
   let res="Draw";
-  if(state.qKey==="one"){
+  if(def && state.qKey==="one"){
     const askerIsPlayer = (state.qAsker==="player");
     const askerNum = askerIsPlayer ? pl : ai;
     const otherNum = askerIsPlayer ? ai : pl;
@@ -821,17 +740,27 @@ function endGame(){
   $("#btnReveal").disabled = true; $("#btnCleanup").disabled = true;
 }
 
+/* ========= コントロール活性制御 ========= */
+function updateControls(){
+  // 後攻=player のときのみ質問UIが有効
+  const qEnable = (state.asker==="player" && !state.revealed && state.aiStarterLocked);
+  document.querySelectorAll(".qbtn").forEach(b=>b.disabled = !qEnable || state.qLocked);
+  setInput.disabled = !(qEnable && state.qKey==="six" && !state.qLocked);
+
+  // Reveal は常に「あなたが何か選んでいる」だけで押せる
+  const canReveal = !state.revealed && (state.selPL!=null || state.basePL!=null);
+  $("#btnReveal").disabled = !canReveal;
+
+  updateBadges();
+}
+
 /* ========= イベント ========= */
 $("#btnReveal").addEventListener("click", revealAndJudge);
 $("#btnCleanup").addEventListener("click", cleanup);
 $("#btnNew").addEventListener("click", resetGame);
-$("#btnLock").addEventListener("click", playerLockNumber);
 
 /* 初期起動 */
 resetGame();
 </script>
 </body>
 </html>
-
-
-
