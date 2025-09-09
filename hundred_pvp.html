@@ -102,9 +102,10 @@
         <div>スコア（先取 <span id="winTargetLabel">5</span>）：P1 <span id="sP1">0</span> - <span id="sP2">0</span> P2　（引分 <span id="sD">0</span>）</div>
       </div>
 
-      <div class="split">
-        <div>
-          <div class="badge" id="badgeP1">P1: 未確定</div>
+      <div class="row" style="gap:12px">
+          <span class="badge" id="badgeP1">P1: 未確定</span>
+          <span class="badge" id="badgeP2">P2: 未確定</span>
+        </div>
           <div style="margin-top:8px">P1 未使用</div>
           <div id="listP1" class="listbox"></div>
         </div>
@@ -136,8 +137,8 @@
       </div>
 
       <div class="row" style="margin-top:8px">
-        <button id="btnReveal" class="accent" disabled>同時公開 → 判定</button>
-        <button id="btnCleanup" disabled>（自動削除中）</button>
+        <button id="btnLock" class="accent">先攻決定</button>
+        <button id="btnReveal" class="accent" disabled>後攻決定</button>
       </div>
       <div class="pass" id="passNote">— デバイスを <span class="who">P1</span> に渡してください —</div>
     </section>
@@ -148,6 +149,12 @@
     </section>
 
     <section class="card">
+      <h2>相手情報</h2>
+      <div class="muted">右の一覧は<b>相手の未使用数字</b>。先手/後攻の入替に合わせて自動で切り替わります。</div>
+      <div class="sep"></div>
+      <div><b>相手未使用（=残り）</b></div>
+      <div id="listOpponent" class="listbox"></div>
+      <div class="sep"></div>
       <h2>ログ</h2>
       <div id="log" class="log"></div>
     </section>
@@ -155,38 +162,26 @@
 
   <section class="card">
     <h2>ルール（要点）</h2>
-    <pre class="rules-raw">
-【基本ルール】
-あなたとAIは、それぞれ1～100の数字カードを持っています。
-先攻後攻ともに、数字カードを１つ伏せて出します。
-せーのでめくって、数字がでかい方の勝ちです。
-同じだったら引き分けになります。
-１度使ったカードはもう使えません。
+    <pre class="rules-raw">【基本】
+1〜100の未使用カードから各自1枚を伏せて同時公開。大きい方の勝ち。同値は引分。使用済みは以後使えません。
+先手・後手は交互。先取本数到達後はWin by 2（デュース）。
 
-これを先攻後攻を交代しながら、先に決まった回数勝利すれば勝ちです。
-ただしリードが１差のままでは決着せず、
-両者が先取本数に到達（例：5-5）するとデュース（Win by 2）になります。
-
-【応用ルール】
-(1)すべての偶数は、すべての奇数に負けます。あらゆるルールに優先します。
-(2)お互い３の倍数だった場合にかぎり、「より小さい方」が勝ちます。
-　このルールは(1)より弱いです。
-　９９と３なら３の勝ちですが、９９と６は９９の勝ちです。奇数なので。
-(3)後述する「ワン」を利用した場合、成功すれば「ワン」が勝ちます。
+【優先順位】
+(1) 偶数は必ず奇数に負け（最優先）。
+(2) 両者3の倍数のときのみ小さい方が勝ち（(1)より弱い）。
+(3) 上記以外は通常の大小比較。
+(4) 後攻の「ワン」が一致した場合、その側の即勝ち（(1)(2)より優先）。
 
 【ライフナイン（後攻専用）】
-後攻側プレイヤーは「ライフナイン」と呼ばれる９つの権利があります。
-以下の中から、毎回どれか１つだけを使うことができます。
-
-ワン    あなたが１～９を出し、相手の下1桁と一致したらあなたの勝利。
-ツー    あなたの選んだ自分の数を +２する（上限なし）。変換先が使用済みでも使える。
-スリー  相手が３の倍数か聞ける（Yes/No）
-フォー  相手の数を４で割った余り（0〜3）を聞ける
-ファイブ 相手の数を５で割った余り（0〜4）を聞ける
-シックス あなたが最大６つの数字を指定し、そのいずれかかどうかを聞ける（Yes/No）
-セブン  あなたの数字の「10 の位」を７にする（例: 53→73）。変換先が使用済みでも使える。
-エイト  相手が80以上かどうかを聞ける（Yes/No）
-ナイン  あなたの選んだ自分の数を９倍にする（上限なし）。変換先が使用済みでも使える。
+ワン: 自分が1〜9で相手の下一桁一致なら即勝利。
+ツー: 自分に+2（上限なし、変換先が使用済みでも使える）。
+スリー: 相手は3の倍数か？（Yes/No）。
+フォー: 相手%4の余り（0-3）。
+ファイブ: 相手%5の余り（0-4）。
+シックス: 指定最大6個の集合に相手が含まれるか？（Yes/No）。
+セブン: 自分を70+下一桁に。
+エイト: 相手は80以上か？（Yes/No）。
+ナイン: 自分を×9（上限なし、変換先が使用済みでも使える）。
 </pre>
   </section>
 </main>
@@ -234,6 +229,7 @@ const state = {
 const $ = s => document.querySelector(s);
 const gridEl = $("#grid"), logEl = $("#log"), statusEl = $("#status");
 const listP1 = $("#listP1"), listP2 = $("#listP2");
+const listOpponent = $("#listOpponent");
 const badgeP1 = $("#badgeP1"), badgeP2 = $("#badgeP2");
 const passNote = $("#passNote");
 
@@ -241,6 +237,10 @@ const passNote = $("#passNote");
 function log(line){ const div=document.createElement("div"); div.innerHTML=line; logEl.appendChild(div); logEl.scrollTop=logEl.scrollHeight; }
 function numArrayDesc(set){ return Array.from(set).sort((a,b)=>b-a); }
 function renderLists(){ listP1.textContent = numArrayDesc(state.availableP1).join(", "); listP2.textContent = numArrayDesc(state.availableP2).join(", "); }
+function renderOpponent(){
+  const oppSet = (state.turnStarter==="p1") ? state.availableP2 : state.availableP1;
+  if(listOpponent) listOpponent.textContent = numArrayDesc(oppSet).join(", ");
+}
 function updateBadges(){
   const p1Text = state.baseP1!=null? `確定(${state.baseP1})` : (state.selP1?`選択中(${state.selP1})`:"未確定");
   const p2Text = state.baseP2!=null? `確定(${state.baseP2})` : (state.selP2?`選択中(${state.selP2})`:"未確定");
@@ -297,7 +297,7 @@ function resetGame(){
   logEl.innerHTML="";
   statusEl.textContent = "対局開始。先手が数字を選び、後攻がライフナインを選択します。";
   updatePassNote();
-  renderGrid(); renderLists(); updateScore(); updateBadges();
+  renderGrid(); renderLists(); renderOpponent(); updateScore(); updateBadges();
   nextTurn();
 }
 
@@ -404,10 +404,10 @@ function nextTurn(){
   else if(state.turn===1){ statusEl.textContent = `対局開始。先取本数は ${state.winTarget}。`; }
 
   updatePassNote();
-  renderGrid(); renderLists(); updateBadges(); updateControls();
+  renderGrid(); renderLists(); renderOpponent(); updateBadges(); updateControls();
 }
 
-function updatePassNote(){ passNote.innerHTML = `— デバイスを <span class="who">${(state.turnStarter==="p1"?"P1":"P2")}</span> に渡してください —`; }
+function updatePassNote(){ passNote.innerHTML = `— 今は <span class="who">${(state.turnStarter==="p1"?"P1":"P2")}</span> のターンです —`; }</span> に渡してください —`; }
 
 /* ========= 公開（処理） ========= */
 function revealAndJudge(){
@@ -496,7 +496,7 @@ function cleanup(){
   if(state.baseP1!=null) state.history.p1.push(state.baseP1);
   if(state.baseP2!=null) state.history.p2.push(state.baseP2);
 
-  renderGrid(); renderLists(); updateBadges();
+  renderGrid(); renderLists(); renderOpponent(); updateBadges();
   $("#btnCleanup").disabled = true;
 
   if(!maybeFinishByTarget()) nextTurn();
@@ -518,18 +518,37 @@ function updateControls(){
   document.querySelectorAll(".qbtn").forEach(b=>b.disabled = !qEnable || state.qLocked);
   setInput.disabled = !(qEnable && state.qKey==="six" && !state.qLocked);
 
-  // 公開
-  const canReveal = !state.revealed && (
-    (state.turnStarter==="p1"? (state.selP1!=null || state.baseP1!=null) : (state.selP2!=null || state.baseP2!=null)) &&
-    ((state.asker==="p1"? (state.selP1!=null || state.baseP1!=null) : (state.selP2!=null || state.baseP2!=null)))
+  // 先攻決定ボタンの活性
+  const canLock = !state.revealed && (
+    (state.turnStarter==="p1" && state.baseP1==null && state.selP1!=null) ||
+    (state.turnStarter==="p2" && state.baseP2==null && state.selP2!=null)
   );
-  $("#btnReveal").disabled = !canReveal;
-  updateBadges();
+  $("#btnLock").disabled = !canLock;
+
+  // 後攻決定（公開）の活性：両者の基底確定＋（質問があれば確定）
+  const bothLocked = (state.baseP1!=null && state.baseP2!=null);
+  const qOk = (state.qKey==null) || (state.qLocked===true);
+  $("#btnReveal").disabled = !( !state.revealed && bothLocked && qOk );
+
+  updateBadges(); renderOpponent();
 }
 
 /* ========= イベント ========= */
+$("#btnLock").addEventListener("click", ()=>{
+  if(state.revealed) return;
+  if(state.turnStarter==="p1"){
+    if(state.selP1==null){ alert("P1の数字を選んでください。"); return; }
+    state.baseP1 = state.selP1; log("<b>P1が数字を確定</b>");
+  }else{
+    if(state.selP2==null){ alert("P2の数字を選んでください。"); return; }
+    state.baseP2 = state.selP2; log("<b>P2が数字を確定</b>");
+  }
+  updatePassNote(); updateControls();
+});
+
+/* ========= イベント ========= */
 $("#btnReveal").addEventListener("click", revealAndJudge);
-$("#btnCleanup").addEventListener("click", cleanup);
+
 $("#btnNew").addEventListener("click", resetGame);
 
 /* 初期起動 */
