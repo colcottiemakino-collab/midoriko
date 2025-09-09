@@ -75,7 +75,6 @@
         <option value="hard">hard</option>
         <option value="expert">expert</option>
         <option value="hell">hell</option>
-        <option value="omega">omega</option>
       </select>
 
       <label>先取本数</label>
@@ -236,10 +235,7 @@ const state = {
 
   revealed:false,
   score: {you:0, ai:0, draw:0},
-  history: {player:[], ai:[]},
-
-  // omega 用一時保存
-  _omegaPlan: null
+  history: {player:[], ai:[]}
 };
 
 const $ = sel => document.querySelector(sel);
@@ -298,7 +294,6 @@ function resetGame(){
   state.qKey=null; state.qAsker=null; state.qLocked=false; state.qSetN=[]; state.qAnswerPrivate=null; state.qAIAutoSet=[];
   state.revealed=false; state.history={player:[], ai:[]};
   state.score={you:0, ai:0, draw:0};
-  state._omegaPlan=null;
 
   state.winTarget = parseInt($("#targetWins").value,10);
   $("#winTargetLabel").textContent = String(state.winTarget);
@@ -426,127 +421,12 @@ function pickByExpertFollowerPolicy(avail){
   return pick ?? anyFrom(avail);
 }
 
-/* ========= omega: 情報制約つき期待値ヘルパ ========= */
-function singleWinRate(my, op){
-  const r = judgeCore(my, op);
-  return r==="Player" ? 1 : r==="Draw" ? 0.5 : 0;
-}
-function applySelfOpVirtual(num, op){
-  if(num==null) return null;
-  if(op==="plus2") return num + 2;
-  if(op==="times9") return num * 9;
-  if(op==="to70s") return 70 + (num % 10);
-  return num;
-}
-function buildOpponentBelief(remainingSet, {opIsStarter}){
-  const w = new Map();
-  for(const x of remainingSet){
-    let weight = (x%2===1) ? 1.0 : 0.25;
-    if(x%2===1 && x%3===0) weight *= (x<=45 ? 1.15 : 0.85);
-    if(opIsStarter){
-      if(x%2===1 && x>=71) weight *= 1.2;
-    }else{
-      if(x%2===1) weight *= 1.15;
-      if(x%2===1 && x>=71) weight *= 1.2;
-    }
-    w.set(x, Math.max(0.001, weight));
-  }
-  const sum = [...w.values()].reduce((a,b)=>a+b,0) || 1;
-  for(const k of w.keys()) w.set(k, w.get(k)/sum);
-  return w;
-}
-function expectedWinRateAgainstBelief(base, selfOp, belief){
-  const my = applySelfOpVirtual(base, selfOp);
-  let ev=0;
-  for(const [op,p] of belief.entries()) ev += p*singleWinRate(my, op);
-  return ev;
-}
-function argmaxBaseWithOp(availSet, belief, selfOp){
-  let best=null, bestEv=-1;
-  for(const b of availSet){
-    const ev = expectedWinRateAgainstBelief(b, selfOp, belief);
-    if(ev>bestEv){ bestEv=ev; best=b; }
-  }
-  return {base:best, ev:bestEv};
-}
-function expectedEVViaQuestion(availSet, belief, key){
-  function splitBy(predFn, bins){
-    const sub = Array.from({length:bins}, ()=>new Map());
-    const mass = new Array(bins).fill(0);
-    for(const [op,p] of belief.entries()){
-      const idx = predFn(op);
-      sub[idx].set(op, (sub[idx].get(op)||0)+p);
-      mass[idx]+=p;
-    }
-    for(let i=0;i<bins;i++){
-      const s = mass[i]||0;
-      if(s>0){ for(const k of sub[i].keys()) sub[i].set(k, sub[i].get(k)/s); }
-    }
-    return {sub, mass};
-  }
-  let bins=0, pred=null;
-  if(key==="three"){ bins=2; pred=op=>op%3===0?1:0; }
-  else if(key==="four"){ bins=4; pred=op=>((op%4)+4)%4; }
-  else if(key==="five"){ bins=5; pred=op=>((op%5)+5)%5; }
-  else if(key==="eight"){ bins=2; pred=op=>op>=80?1:0; }
-  else if(key==="six"){
-    const top6 = [...belief.entries()].sort((a,b)=>b[1]-a[1]).slice(0,6).map(([n])=>n);
-    const S = new Set(top6);
-    bins=2; pred=op=>S.has(op)?1:0;
-  }else{
-    return {ev:-1, plan:null};
-  }
-  const {sub, mass} = splitBy(pred, bins);
-  const plan = {};
-  let totalEv=0;
-  for(let i=0;i<bins;i++){
-    if(mass[i]===0) continue;
-    const r = argmaxBaseWithOp(availSet, sub[i], null); // 質問使用ターンは自己変換なし
-    plan[i] = r.base;
-    totalEv += mass[i]*r.ev;
-  }
-  return {ev: totalEv, plan};
-}
-function omegaPickStarter(availSet, oppSet){
-  // 先手はライフナイン不可。基底札のみ、事前分布に対する期待勝率最大の奇数寄りを選ぶ。
-  const belief = buildOpponentBelief(oppSet, {opIsStarter:false});
-  const r = argmaxBaseWithOp(availSet, belief, null);
-  return {base:r.base, op:null, ev:r.ev};
-}
-function omegaDecideFollowerAction(availSet, oppRemainingSet){
-  const prior = buildOpponentBelief(oppRemainingSet, {opIsStarter:true});
-  const selfOps = [null,"plus2","times9"].concat(state.turn>=11?["to70s"]:[]);
-  let bestSelf = {key:"one", base:null, ev:-1, op:null};
-  for(const op of selfOps){
-    const r = argmaxBaseWithOp(availSet, prior, op);
-    if(r.ev>bestSelf.ev){
-      const key = op===null?"one": op==="plus2"?"two": op==="times9"?"nine":"seven";
-      bestSelf = {key, base:r.base, ev:r.ev, op};
-    }
-  }
-  const qKeys = ["three","four","five","six","eight"];
-  let bestQ = {key:null, ev:-1, plan:null};
-  for(const q of qKeys){
-    const {ev, plan} = expectedEVViaQuestion(availSet, prior, q);
-    if(ev>bestQ.ev) bestQ = {key:q, ev, plan};
-  }
-  if(bestQ.ev > bestSelf.ev){
-    return {type:"question", key:bestQ.key, plan:bestQ.plan};
-  }else{
-    return {type:"self", key:bestSelf.key, base:bestSelf.base, op:bestSelf.op};
-  }
-}
-
 /* ========= AI: 先手確定（AIが先手のとき、ターン開始時に選んで保持） ========= */
 function aiPickStarterAndHold(){
   const diff = $("#difficulty").value;
   let pick=null;
 
-  if(diff==="omega"){
-    const res = omegaPickStarter(state.availableAI, state.availablePL);
-    pick = res.base ?? anyFrom(state.availableAI);
-
-  }else if(diff==="expert"){
+  if(diff==="expert"){
     pick = pickOddGE(state.availableAI, 70)
         ?? firstAvailable(state.availableAI, x=>x%2===1 && x%3===0 && x<50)
         ?? oddsLargePref(state.availableAI)
@@ -586,6 +466,7 @@ function aiPickStarterAndHold(){
       if(!pick) pick = pickSmallOddMultipleOf3();
     }
 
+    // 保険のフォールバック
     if(!pick) pick = pickOddGE(avail, 70)
                  ?? firstAvailable(avail, x=>x%2===1 && x%3===0 && x<50)
                  ?? oddsLargePref(avail)
@@ -612,47 +493,6 @@ function aiChooseQuestionAndLockAfterPlayerStarterLocked(){
   const diff = $("#difficulty").value;
   let key=null;
 
-  if(diff==="omega"){
-    // 事前分布だけで「質問 or 自己変換」を決定し、回答は非公開で取得して基底札を確定
-    const act = omegaDecideFollowerAction(state.availableAI, state.availablePL);
-    state._omegaPlan = act;
-
-    if(act.type==="question"){
-      key = act.key;
-      state.qKey = key; state.qAsker="ai"; state.qLocked=true;
-      state.qAnswerPrivate = null; state.qAIAutoSet=[];
-      const target = state.basePL;
-
-      if(key==="three"){ state.qAnswerPrivate = (target%3===0); }
-      if(key==="four"){  state.qAnswerPrivate = ((target%4)+4)%4; }
-      if(key==="five"){  state.qAnswerPrivate = ((target%5)+5)%5; }
-      if(key==="eight"){ state.qAnswerPrivate = (target>=80); }
-      if(key==="six"){
-        // 集合は prior 由来の上位6で十分（可視化は公開時）
-        const all = Array.from({length:100},(_,i)=>i+1);
-        const picks=[]; for(let i=1;i<=6;i++){ const p=i/7; picks.push(all[Math.floor(all.length*p)]); }
-        state.qAIAutoSet = [...new Set(picks)];
-        state.qAnswerPrivate = new Set(state.qAIAutoSet).has(target);
-      }
-
-      const ansIdx = (key==="three"||key==="eight") ? (state.qAnswerPrivate?1:0)
-                  : (key==="six") ? (state.qAnswerPrivate?1:0)
-                  : (key==="four"||key==="five") ? state.qAnswerPrivate
-                  : 0;
-      const chosenBase = act.plan[ansIdx] ?? anyFrom(state.availableAI);
-      state.selAI = chosenBase; state.baseAI = chosenBase;
-      updateBadges();
-      return;
-
-    }else{ // self
-      key = act.key;
-      state.qKey = key; state.qAsker="ai"; state.qLocked=true;
-      state.selAI = act.base; state.baseAI = act.base;
-      updateBadges();
-      return;
-    }
-  }
-
   if(diff==="hell"){
     // 最初の10ターンはセブン封印（turn 1〜10）。11以降で解禁。
     const includeSeven = (state.turn >= 11);
@@ -661,6 +501,7 @@ function aiChooseQuestionAndLockAfterPlayerStarterLocked(){
 
     key = pickRandom(pool);
 
+    // 二重ガード：禁止ターンに seven が来たら再抽選（最大5回）。ダメなら three。
     if(key==="seven" && !includeSeven){
       let tries=0;
       while(key==="seven" && tries<5){
@@ -707,10 +548,7 @@ function aiPickFollowerAndLockByPolicy(){
   let pick=null;
   const avail = state.availableAI;
 
-  if(diff==="omega"){
-    // すでに aiChooseQuestion... 内で確定済み。ここで上書きしない。
-    return;
-  }else if(diff==="expert"){
+  if(diff==="expert"){
     pick = pickByExpertFollowerPolicy(avail);
   }else if(diff==="hell"){
     // 後攻時の数字選択は expert と同じ方針
@@ -724,11 +562,9 @@ function aiPickFollowerAndLockByPolicy(){
     pick = oddsLargeExcept3Small(avail) ?? anyFrom(avail);
   }
 
-  if(diff!=="omega"){
-    if(pick==null) pick = anyFrom(avail); // 最終フォールバック（偶数でも可）
-    state.selAI = pick; state.baseAI = pick;
-    updateBadges();
-  }
+  if(pick==null) pick = anyFrom(avail); // 最終フォールバック（偶数でも可）
+  state.selAI = pick; state.baseAI = pick;
+  updateBadges();
 }
 
 /* ========= プレイヤーUI（後攻時の質問） ========= */
@@ -798,7 +634,6 @@ function nextTurn(){
   state.selAI=null; state.baseAI=null; state.aiStarterLocked=false;
   state.qKey=null; state.qAsker=null; state.qLocked=false; state.qSetN=[]; state.qAnswerPrivate=null; state.qAIAutoSet=[];
   state.revealed=false;
-  state._omegaPlan=null;
 
   Array.from(gridEl.children).forEach(c=>c.classList.remove("selected"));
 
@@ -955,4 +790,4 @@ $("#btnNew").addEventListener("click", resetGame);
 resetGame();
 </script>
 </body>
-</html>
+</html>使用済みでも使える。
