@@ -59,14 +59,13 @@
 
   .badge{display:inline-block; padding:4px 10px; border-radius:999px; border:1px solid var(--border); background:#0f2016; font-size:12px; color:#cfe9d5}
 
-  .split{display:none}
   .who{font-weight:700; color:var(--warn)}
   .pass{display:block; text-align:center; padding:8px; border:1px dashed var(--border); border-radius:10px; margin-top:6px}
 </style>
 </head>
 <body>
 <header>
-  <h1>ハンドレッド / Hundred PvP ver 3.2.0（人間×人間／1台交互）</h1>
+  <h1>ハンドレッド / Hundred PvP ver 3.2.1（人間×人間／1台交互）</h1>
 </header>
 
 <main>
@@ -102,18 +101,10 @@
         <div>スコア（先取 <span id="winTargetLabel">5</span>）：P1 <span id="sP1">0</span> - <span id="sP2">0</span> P2　（引分 <span id="sD">0</span>）</div>
       </div>
 
+      <!-- 状態バッジのみ（未使用リストは右に移動済み） -->
       <div class="row" style="gap:12px">
-          <span class="badge" id="badgeP1">P1: 未確定</span>
-          <span class="badge" id="badgeP2">P2: 未確定</span>
-        </div>
-          <div style="margin-top:8px">P1 未使用</div>
-          <div id="listP1" class="listbox"></div>
-        </div>
-        <div>
-          <div class="badge" id="badgeP2">P2: 未確定</div>
-          <div style="margin-top:8px">P2 未使用</div>
-          <div id="listP2" class="listbox"></div>
-        </div>
+        <span class="badge" id="badgeP1">P1: 未確定</span>
+        <span class="badge" id="badgeP2">P2: 未確定</span>
       </div>
 
       <div class="sep"></div>
@@ -140,7 +131,7 @@
         <button id="btnLock" class="accent">先攻決定</button>
         <button id="btnReveal" class="accent" disabled>後攻決定</button>
       </div>
-      <div class="pass" id="passNote">— デバイスを <span class="who">P1</span> に渡してください —</div>
+      <div class="pass" id="passNote">— 今は <span class="who">P1</span> のターンです —</div>
     </section>
 
     <section class="card">
@@ -228,7 +219,6 @@ const state = {
 /* ========= DOM ========= */
 const $ = s => document.querySelector(s);
 const gridEl = $("#grid"), logEl = $("#log"), statusEl = $("#status");
-const listP1 = $("#listP1"), listP2 = $("#listP2");
 const listOpponent = $("#listOpponent");
 const badgeP1 = $("#badgeP1"), badgeP2 = $("#badgeP2");
 const passNote = $("#passNote");
@@ -236,7 +226,6 @@ const passNote = $("#passNote");
 /* ========= ユーティリティ ========= */
 function log(line){ const div=document.createElement("div"); div.innerHTML=line; logEl.appendChild(div); logEl.scrollTop=logEl.scrollHeight; }
 function numArrayDesc(set){ return Array.from(set).sort((a,b)=>b-a); }
-function renderLists(){ listP1.textContent = numArrayDesc(state.availableP1).join(", "); listP2.textContent = numArrayDesc(state.availableP2).join(", "); }
 function renderOpponent(){
   const oppSet = (state.turnStarter==="p1") ? state.availableP2 : state.availableP1;
   if(listOpponent) listOpponent.textContent = numArrayDesc(oppSet).join(", ");
@@ -297,14 +286,14 @@ function resetGame(){
   logEl.innerHTML="";
   statusEl.textContent = "対局開始。先手が数字を選び、後攻がライフナインを選択します。";
   updatePassNote();
-  renderGrid(); renderLists(); renderOpponent(); updateScore(); updateBadges();
+  renderGrid(); renderOpponent(); updateScore(); updateBadges();
   nextTurn();
 }
 
 /* ========= 判定 ========= */
 function judgeCore(a, b){
   const aOdd=(a%2===1), bOdd=(b%2===1);
-  if(aOdd!==bOdd){ return aOdd? "A" : "B"; } // 奇数が勝ち（偶数は負け）
+  if(aOdd!==bOdd){ return aOdd? "A" : "B"; }
   const aM3=(a%3===0), bM3=(b%3===0);
   if(aM3 && bM3){ if(a<b) return "A"; if(a>b) return "B"; return "D"; }
   if(a>b) return "A"; if(a<b) return "B"; return "D";
@@ -336,7 +325,7 @@ const qButtons = document.querySelectorAll(".qbtn");
 qButtons.forEach(btn=>{
   btn.addEventListener("click", ()=>{
     if(state.revealed) return;
-    if(currentAsker()==="p1" && state.baseP2==null) return; // 後攻はp1、先手p2の基底が要る
+    if(currentAsker()==="p1" && state.baseP2==null) return;
     if(currentAsker()==="p2" && state.baseP1==null) return;
     if(state.qLocked) return;
 
@@ -344,9 +333,9 @@ qButtons.forEach(btn=>{
     btn.classList.add("chosen");
 
     state.qKey = btn.dataset.q; state.qAsker = currentAsker();
-    if(state.qKey==="six"){ state.qSetN=[]; setInput.value=""; setInput.disabled=true; // 入力はchangeで開く
-      // six は手動入力なので、ここでは何もしない（入力で確定）
-      setInput.disabled=false; log(`<b>${whoLabel(state.qAsker)}の権利</b>: シックスを選択。集合を入力してください。`);
+    if(state.qKey==="six"){
+      state.qSetN=[]; setInput.value=""; setInput.disabled=false;
+      log(`<b>${whoLabel(state.qAsker)}の権利</b>: シックスを選択。集合を入力してください。`);
     }else{
       evalQuestionPreview();
       state.qLocked = true; updateControls();
@@ -370,10 +359,15 @@ setInput.addEventListener("change", ()=>{
 function evalQuestionPreview(){
   const def = QDEF[state.qKey]; if(!def) return;
   const target = (state.qAsker==="p1") ? state.baseP2 : state.baseP1;
-  if(def.type==="yn"){ const truth = !!def.fn(target); state.qAnswerPrivate = truth;
+  if(def.type==="yn"){
+    const truth = !!def.fn(target); state.qAnswerPrivate = truth;
     log(`<b>${whoLabel(state.qAsker)}の質問: ${QLABEL[state.qKey]}</b> → <b>${truth?'Yes':'No'}</b>（相手には非公開）`);
-  }else if(def.type==="mod4"){ const r=((target%4)+4)%4; state.qAnswerPrivate=r; log(`<b>${whoLabel(state.qAsker)}の質問: フォー</b> → <b>余り ${r}</b>（相手には非公開）`);
-  }else if(def.type==="mod5"){ const r=((target%5)+5)%5; state.qAnswerPrivate=r; log(`<b>${whoLabel(state.qAsker)}の質問: ファイブ</b> → <b>余り ${r}</b>（相手には非公開）`);
+  }else if(def.type==="mod4"){
+    const r=((target%4)+4)%4; state.qAnswerPrivate=r;
+    log(`<b>${whoLabel(state.qAsker)}の質問: フォー</b> → <b>余り ${r}</b>（相手には非公開）`);
+  }else if(def.type==="mod5"){
+    const r=((target%5)+5)%5; state.qAnswerPrivate=r;
+    log(`<b>${whoLabel(state.qAsker)}の質問: ファイブ</b> → <b>余り ${r}</b>（相手には非公開）`);
   }else{
     log(`<b>${whoLabel(state.qAsker)}の権利</b>: ${QLABEL[state.qKey]} を選択（効果は公開時に適用）`);
   }
@@ -404,10 +398,12 @@ function nextTurn(){
   else if(state.turn===1){ statusEl.textContent = `対局開始。先取本数は ${state.winTarget}。`; }
 
   updatePassNote();
-  renderGrid(); renderLists(); renderOpponent(); updateBadges(); updateControls();
+  renderGrid(); renderOpponent(); updateBadges(); updateControls();
 }
 
-function updatePassNote(){ passNote.innerHTML = `— 今は <span class="who">${(state.turnStarter==="p1"?"P1":"P2")}</span> のターンです —`; }</span> に渡してください —`; }
+function updatePassNote(){
+  passNote.innerHTML = `— 今は <span class="who">${(state.turnStarter==="p1"?"P1":"P2")}</span> のターンです —`;
+}
 
 /* ========= 公開（処理） ========= */
 function revealAndJudge(){
@@ -436,7 +432,7 @@ function revealAndJudge(){
       else if(def.type==="mod5"){ log(`<b>${whoLabel(state.qAsker)}の質問: ファイブ</b> → <b>余り ${state.qAnswerPrivate}</b>`); }
       else if(def.type==="setN"){ log(`<b>${whoLabel(state.qAsker)}の質問: シックス</b> [${state.qSetN.join(", ")}] → <b>${state.qAnswerPrivate?'Yes':'No'}</b>`); }
       else if(def.type==="self"){ log(`<b>${whoLabel(state.qAsker)}の権利: ${QLABEL[state.qKey]}</b>（効果はこれから自分の数に適用）`); }
-      else if(def.type==="rule"){ log(`<b>${whoLabel(state.qAsker)}の権利: ${QLLABEL[state.qKey]}</b>（判定はこれから適用）`); }
+      else if(def.type==="rule"){ log(`<b>${whoLabel(state.qAsker)}の権利: ${QLABEL[state.qKey]}</b>（判定はこれから適用）`); }
     }
   }
 
@@ -450,7 +446,6 @@ function revealAndJudge(){
 
   // ワンの判定（後攻が使っている場合のみ）
   function resolveWithOne(aBase,bBase){
-    // 誰が後攻か
     const follower = (state.turnStarter==="p1")? "p2" : "p1";
     if(def && state.qKey==="one"){
       const askerIsP1 = (state.qAsker==="p1");
@@ -470,7 +465,8 @@ function revealAndJudge(){
   log(`<b>[公開]</b> P1=${a} / P2=${b} → <b>${res==="A"?"P1勝ち":res==="B"?"P2勝ち":"引分"}</b>`);
   updateScore();
 
-  state.revealed = true; $("#btnReveal").disabled = true; $("#btnCleanup").disabled = false;
+  state.revealed = true;
+  // UI掃除ボタンは無いので何もしない
   statusEl.textContent = "判定完了。数字は自動で削除されます。";
   cleanup();
 }
@@ -496,8 +492,7 @@ function cleanup(){
   if(state.baseP1!=null) state.history.p1.push(state.baseP1);
   if(state.baseP2!=null) state.history.p2.push(state.baseP2);
 
-  renderGrid(); renderLists(); renderOpponent(); updateBadges();
-  $("#btnCleanup").disabled = true;
+  renderGrid(); renderOpponent(); updateBadges();
 
   if(!maybeFinishByTarget()) nextTurn();
 }
@@ -506,7 +501,7 @@ function endGame(){
   const msg = `最終スコア：P1 ${state.score.p1} - ${state.score.p2} P2`;
   statusEl.textContent = msg + (state.deuce ? "（デュースの末）" : "") + "　新しい対局で再開できます。";
   log(`<b>=== 終局 ===</b> ${msg}${state.deuce ? "（デュースの末）" : ""}`);
-  $("#btnReveal").disabled = true; $("#btnCleanup").disabled = true;
+  // 余計なボタンは無し
 }
 
 /* ========= コントロール活性 ========= */
@@ -546,9 +541,7 @@ $("#btnLock").addEventListener("click", ()=>{
   updatePassNote(); updateControls();
 });
 
-/* ========= イベント ========= */
 $("#btnReveal").addEventListener("click", revealAndJudge);
-
 $("#btnNew").addEventListener("click", resetGame);
 
 /* 初期起動 */
