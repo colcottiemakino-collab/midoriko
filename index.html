@@ -5,23 +5,50 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Hundred - モード選択</title>
 <style>
+  :root {
+    --bg:#0e1a12;
+    --bg2:#122216;
+    --panel:#152a1b;
+    --accent:#35c46e;
+    --border:#2f6848;
+    --text:#e7ffe7;
+  }
   body {
     margin:0; padding:40px;
     font-family: ui-sans-serif, system-ui, "Hiragino Kaku Gothic ProN", sans-serif;
-    background: linear-gradient(180deg,#0e1a12,#122216);
-    color: #e7ffe7;
+    /* 上から300pxだけグラデーション、それ以降は単色 */
+    min-height:100vh;
+    background: linear-gradient(
+      180deg,
+      var(--bg) 0%,
+      var(--bg2) 300px,
+      var(--bg2) 100%
+    ) no-repeat fixed;
+    background-size: cover;
+    color: var(--text);
     text-align:center;
   }
-  h1 { color:#35c46e; margin-bottom:20px; }
+  h1 {
+    color: var(--accent);
+    margin-bottom:20px;
+  }
   .linkbox {
-    display:inline-block; margin:20px; padding:20px 30px;
-    background:#152a1b; border:1px solid #2f6848; border-radius:14px;
-    text-decoration:none; color:#e7ffe7; font-size:18px; font-weight:600;
+    display:inline-block;
+    margin:20px;
+    padding:20px 30px;
+    background: var(--panel);
+    border:1px solid var(--border);
+    border-radius:14px;
+    text-decoration:none;
+    color: var(--text);
+    font-size:18px;
+    font-weight:600;
     box-shadow:0 6px 12px rgba(0,0,0,.3);
     transition: transform .1s ease, background .2s ease;
   }
   .linkbox:hover {
-    background:#1f5333; transform:translateY(-2px);
+    background:#1f5333;
+    transform:translateY(-2px);
   }
 </style>
 </head>
