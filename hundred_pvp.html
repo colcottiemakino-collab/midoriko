@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ハンドレッド / Hundred PvP ver 3.2.2</title>
+<title>ハンドレッド / Hundred PvP ver 3.2.3</title>
 <style>
   :root{
     --bg:#0e1a12; --bg2:#122216; --panel:#152a1b; --accent:#35c46e; --accent-2:#2aa55b;
@@ -13,6 +13,7 @@
   *{box-sizing:border-box}
   body{
     margin:0;
+    /* 好きな色味は変えず、上部だけ滑らかに→以降は一定色で均一 */
     background: linear-gradient(180deg,var(--bg) 0%, var(--bg2) 300px, var(--bg2) 100%) no-repeat fixed;
     color:var(--text);
     font-family:ui-sans-serif,system-ui,"Segoe UI",Roboto,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
@@ -67,7 +68,7 @@
 </head>
 <body>
 <header>
-  <h1>ハンドレッド / Hundred PvP ver 3.2.2（人間×人間／1台交互）</h1>
+  <h1>ハンドレッド / Hundred PvP ver 3.2.3（人間×人間／1台交互）</h1>
 </header>
 
 <main>
@@ -154,38 +155,26 @@
 
   <section class="card">
     <h2>ルール（要点）</h2>
-    <pre class="rules-raw">
-【基本ルール】
-あなたとAIは、それぞれ1～100の数字カードを持っています。
-先攻後攻ともに、数字カードを１つ伏せて出します。
-せーのでめくって、数字がでかい方の勝ちです。
-同じだったら引き分けになります。
-１度使ったカードはもう使えません。
+    <pre class="rules-raw">【基本】
+1〜100の未使用カードから各自1枚を伏せて同時公開。大きい方の勝ち。同値は引分。使用済みは以後使えません。
+先攻・後攻は交互。先取本数到達後はWin by 2（デュース）。
 
-これを先攻後攻を交代しながら、先に決まった回数勝利すれば勝ちです。
-ただしリードが１差のままでは決着せず、
-両者が先取本数に到達（例：5-5）するとデュース（Win by 2）になります。
-
-【応用ルール】
-(1)すべての偶数は、すべての奇数に負けます。あらゆるルールに優先します。
-(2)お互い３の倍数だった場合にかぎり、「より小さい方」が勝ちます。
-　このルールは(1)より弱いです。
-　９９と３なら３の勝ちですが、９９と６は９９の勝ちです。奇数なので。
-(3)後述する「ワン」を利用した場合、成功すれば「ワン」が勝ちます。
+【優先順位】
+(1) 偶数は必ず奇数に負け（最優先）。
+(2) 両者3の倍数のときのみ小さい方が勝ち（(1)より弱い）。
+(3) 上記以外は通常の大小比較。
+(4) 後攻の「ワン」が一致した場合、その側の即勝ち（(1)(2)より優先）。
 
 【ライフナイン（後攻専用）】
-後攻側プレイヤーは「ライフナイン」と呼ばれる９つの権利があります。
-以下の中から、毎回どれか１つだけを使うことができます。
-
-ワン    あなたが１～９を出し、相手の下1桁と一致したらあなたの勝利。
-ツー    あなたの選んだ自分の数を +２する（上限なし）。変換先が使用済みでも使える。
-スリー  相手が３の倍数か聞ける（Yes/No）
-フォー  相手の数を４で割った余り（0〜3）を聞ける
-ファイブ 相手の数を５で割った余り（0〜4）を聞ける
-シックス あなたが最大６つの数字を指定し、そのいずれかかどうかを聞ける（Yes/No）
-セブン  あなたの数字の「10 の位」を７にする（例: 53→73）。変換先が使用済みでも使える。
-エイト  相手が80以上かどうかを聞ける（Yes/No）
-ナイン  あなたの選んだ自分の数を９倍にする（上限なし）。変換先が使用済みでも使える。
+ワン: 自分が1〜9で相手の下一桁一致なら即勝利。
+ツー: 自分に+2（上限なし、変換先が使用済みでも使える）。
+スリー: 相手は3の倍数か？（Yes/No）。
+フォー: 相手%4の余り（0-3）。
+ファイブ: 相手%5の余り（0-4）。
+シックス: 指定最大6個の集合に相手が含まれるか？（Yes/No）。
+セブン: 自分を70+下一桁に。
+エイト: 相手は80以上か？（Yes/No）。
+ナイン: 自分を×9（上限なし、変換先が使用済みでも使える）。
 </pre>
   </section>
 </main>
@@ -211,7 +200,7 @@ const state = {
   initialStarter: "p1",
   turnStarter: "p1", // そのターンの先攻
   asker: "p2",       // そのターンの後攻
-  phase: "starter",  // "starter"（先攻の思考/選択中） or "follower"（後攻の思考/選択中）
+  phase: "starter",  // "starter" | "follower"
 
   winTarget: 5,
   deuce: false,
@@ -242,13 +231,13 @@ const setInput = $("#setInput");
 /* ========= ユーティリティ ========= */
 function log(line){ const div=document.createElement("div"); div.innerHTML=line; logEl.appendChild(div); logEl.scrollTop=logEl.scrollHeight; }
 function numArrayDesc(set){ return Array.from(set).sort((a,b)=>b-a); }
+function otherOf(w){ return w==="p1"?"p2":"p1"; }
 
 /* 操作中の側 */
 function currentActor(){
   if(state.phase==="starter") return state.turnStarter;
-  return state.turnStarter==="p1" ? "p2" : "p1";
+  return otherOf(state.turnStarter);
 }
-function otherOf(w){ return w==="p1"?"p2":"p1"; }
 
 /* ========= レンダリング ========= */
 function renderOpponent(){
@@ -334,7 +323,6 @@ function resetGame(){
   state.winTarget = parseInt($("#targetWins").value,10);
   $("#winTargetLabel").textContent = String(state.winTarget);
 
-  // 初回の先攻だけここで決定（以降は交互）
   const starterSel = $("#starter").value;
   state.initialStarter = (starterSel==="random") ? (Math.random()<0.5?"p1":"p2") : starterSel;
   state.turn = 0;
@@ -546,12 +534,12 @@ function endGame(){
   const msg = `最終スコア：P1 ${state.score.p1} - ${state.score.p2} P2`;
   statusEl.textContent = msg + (state.deuce ? "（デュースの末）" : "") + "　新しい対局で再開できます。";
   log(`<b>=== 終局 ===</b> ${msg}${state.deuce ? "（デュースの末）" : ""}`);
-  // ここで止める（startTurnしない）
+  // ここで終了（次ターンへは進めない）
 }
 
-/* ========= コントロール活性 ========= */
+/* ========= コントロール活性（重要：後攻決定の条件を簡潔化） ========= */
 function updateControls(){
-  // 後攻の権利は、先攻の基底が確定してから & 後攻フェーズで有効
+  // ライフナイン（後攻の権利）
   const qEnable = (!state.revealed && state.phase==="follower" && (
     (state.asker==="p1" && state.baseP2!=null) || (state.asker==="p2" && state.baseP1!=null)
   ));
@@ -567,11 +555,12 @@ function updateControls(){
 
   // 後攻決定（後攻フェーズで、先攻は確定済み＋後攻は選択 or 確定済み）＆質問があれば確定済み
   const follower = otherOf(state.turnStarter);
-  const followerReady = (follower==="p1") ? (state.baseP1!=null || state.selP1!=null) : (state.baseP2!=null || state.selP2!=null);
+  const starterReady = (state.turnStarter==="p1") ? state.baseP1!=null : state.baseP2!=null;
+  const followerReady = (follower==="p1") ? (state.baseP1!=null || state.selP1!=null)
+                                          : (state.baseP2!=null || state.selP2!=null);
   const qOk = (state.qKey==null) || (state.qLocked===true);
-  const canReveal = (!state.revealed && state.phase==="follower" &&
-                     ((state.turnStarter==="p1" ? state.baseP1!=null : state.baseP2!=null)) &&
-                     followerReady && qOk);
+
+  const canReveal = (!state.revealed && state.phase==="follower" && starterReady && followerReady && qOk);
   $("#btnReveal").disabled = !canReveal;
 
   updatePassNote();
@@ -581,7 +570,6 @@ function updateControls(){
 
 /* ========= 初期イベント ========= */
 $("#btnNew").addEventListener("click", resetGame);
-document.querySelectorAll(".qbtn"); // already wired above
 
 /* 起動 */
 resetGame();
