@@ -19,13 +19,21 @@
   }
   header{padding:18px 20px; border-bottom:1px solid var(--border); display:flex; gap:12px; align-items:baseline; flex-wrap:wrap}
   h1{margin:0; font-size:20px; letter-spacing:.08em; color:var(--accent)}
+
+  /* ===== レイアウト：広い時=中央3カラム / 狭い時=5枚縦積み ===== */
   main{display:grid; grid-template-columns: 1fr; gap:12px; padding:12px}
-
   .wrap{display:grid; grid-template-columns: 1fr; gap:12px}
-  @media (min-width: 980px){ .wrap{grid-template-columns: 420px 1fr 420px} }
+  @media (min-width: 980px){
+    /* 中央3枚は横に並ぶ（左:ターン/進行, 中:盤面, 右:相手情報） */
+    .wrap{grid-template-columns: 420px 1fr 420px}
+  }
+  /* これで「上に1枚（セットアップ）→中央に3枚（wrap内）→下に1枚（ルール）」。
+     画面が小さくなると main も wrap も1カラムになり、合計5枚が縦に並ぶ。 */
 
-  .card{background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:14px;
-    box-shadow: 0 10px 20px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.04);}
+  .card{
+    background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:14px;
+    box-shadow: 0 10px 20px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.04);
+  }
   .card h2{margin:0 0 10px; font-size:16px; color:var(--accent)}
   .row{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
   select, button, input{
@@ -39,11 +47,22 @@
   .accent:hover{filter:brightness(1.05)}
   .muted{color:var(--muted); font-size:12px}
 
-  .grid{display:grid; grid-template-columns: repeat(10, minmax(0,1fr)); gap:6px}
+  /* ===== 盤面：10列固定のまま「横方向にシュリンク」 ===== */
+  .grid{
+    display:grid;
+    grid-template-columns: repeat(10, minmax(0,1fr));
+    gap: clamp(3px, 0.8vw, 6px);
+    width: 100%;
+  }
   .cell{
-    padding:10px 0; text-align:center; border-radius:10px; border:1px solid var(--border);
-    user-select:none; cursor:pointer; background:#13301e; transition:transform .05s ease, background .15s ease;
-    font-variant-numeric:tabular-nums; font-size:14px;
+    min-width: 0; /* これが無いと縮小時にはみ出しやすい */
+    padding-block: clamp(6px, 1.2vw, 10px);
+    text-align:center; border-radius:10px; border:1px solid var(--border);
+    user-select:none; cursor:pointer; background:#13301e;
+    transition:transform .05s ease, background .15s ease;
+    font-variant-numeric:tabular-nums;
+    font-size: clamp(10px, 1.6vw, 14px); /* 文字サイズも連動縮小 */
+    line-height: 1;
   }
   .cell:hover{transform:translateY(-1px); background:#184029}
   .cell.used{background:var(--grid-used); color:#6e8a78; border-style:dashed; cursor:not-allowed}
@@ -71,6 +90,7 @@
 </header>
 
 <main>
+  <!-- ① 上の1枚：セットアップ -->
   <section class="card">
     <h2>セットアップ</h2>
     <div class="row" style="margin-bottom:8px">
@@ -91,6 +111,7 @@
     <div id="status" class="muted">対局を開始してください。</div>
   </section>
 
+  <!-- ② 中央3枚：wrap（幅広時は3カラム、狭幅時は縦並び） -->
   <div class="wrap">
     <section class="card">
       <h2>ターン／進行</h2>
@@ -152,6 +173,7 @@
     </section>
   </div>
 
+  <!-- ③ 下の1枚：ルール -->
   <section class="card">
     <h2>ルール（要点）</h2>
     <pre class="rules-raw">【基本】
@@ -178,6 +200,7 @@
   </section>
 </main>
 
+<!-- ▼▼▼ ここから下は JS（そのまま：一切変更なし） ▼▼▼ -->
 <script>
 /* ========= 定義 ========= */
 const QDEF = {
@@ -423,9 +446,9 @@ $("#btnLock").addEventListener("click", ()=>{
     state.baseP2 = state.selP2; log("<b>P2（先攻）が数字を確定</b>");
   }
 
-  // ★ ここが重要：後攻フェーズへ遷移したら盤面を後攻側で再描画
+  // ★ 後攻フェーズへ遷移したら盤面を後攻側で再描画
   state.phase = "follower";
-  renderGrid();        // ← 追加：後攻が自分の数字を選べる盤面に切り替える
+  renderGrid();
   updatePassNote();
   updateControls();
   renderOpponent();
@@ -573,5 +596,6 @@ $("#btnNew").addEventListener("click", resetGame);
 /* 起動 */
 resetGame();
 </script>
+<!-- ▲▲▲ JSはオリジナルのまま ▲▲▲ -->
 </body>
 </html>
