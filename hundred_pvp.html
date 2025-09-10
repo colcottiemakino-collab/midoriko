@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ハンドレッド / Hundred PvP ver 3.2.6</title>
+<title>ハンドレッド / Hundred PvP ver 3.2.7</title>
 <style>
   :root{
     --bg:#0e1a12; --bg2:#122216; --panel:#152a1b; --accent:#35c46e; --accent-2:#2aa55b;
@@ -13,7 +13,6 @@
   *{box-sizing:border-box}
   body{
     margin:0;
-    /* 上だけなだらか→以降は一定色。色味は変えない */
     background: linear-gradient(180deg,var(--bg) 0%, var(--bg2) 300px, var(--bg2) 100%) no-repeat fixed;
     color:var(--text);
     font-family:ui-sans-serif,system-ui,"Segoe UI",Roboto,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
@@ -68,7 +67,7 @@
 </head>
 <body>
 <header>
-  <h1>ハンドレッド / Hundred PvP ver 3.2.6（人間×人間／1台交互）</h1>
+  <h1>ハンドレッド / Hundred PvP ver 3.2.7（人間×人間／1台交互）</h1>
 </header>
 
 <main>
@@ -198,8 +197,8 @@ const QLABEL = {one:"ワン", two:"ツー", three:"スリー", four:"フォー",
 const state = {
   turn: 0,
   initialStarter: "p1",
-  turnStarter: "p1", // そのターンの先攻
-  asker: "p2",       // そのターンの後攻
+  turnStarter: "p1", // 先攻
+  asker: "p2",       // 後攻
   phase: "starter",  // "starter" | "follower"
 
   winTarget: 5,
@@ -329,7 +328,7 @@ function resetGame(){
   state.turn = 0;
 
   logEl.innerHTML="";
-  statusEl.textContent = "対局開始。先攻が数字を選び、後攻がライフナインを選択します。";
+  statusEl.textContent = "先攻が数字を選び、後攻がライフナインを選択します。";
 
   startTurn(); // ターン1へ
 }
@@ -386,7 +385,6 @@ setInput.addEventListener("change", ()=>{
   const vals = setInput.value.trim().split(/\s+/).filter(s=>s.length>0).map(s=>parseInt(s,10)).filter(n=>Number.isInteger(n)&&n>=1&&n<=100);
   state.qSetN = [...new Set(vals)].slice(0,6);
   setInput.value = state.qSetN.join(" ");
-  // 後攻から見た先攻の基底（phase=followerなら必ず確定済み）
   const target = (state.qAsker==="p1") ? state.baseP2 : state.baseP1;
   const truth = new Set(state.qSetN).has(target);
   state.qAnswerPrivate = truth;
@@ -425,9 +423,12 @@ $("#btnLock").addEventListener("click", ()=>{
     state.baseP2 = state.selP2; log("<b>P2（先攻）が数字を確定</b>");
   }
 
-  // 後攻フェーズへ
+  // ★ ここが重要：後攻フェーズへ遷移したら盤面を後攻側で再描画
   state.phase = "follower";
-  updatePassNote(); updateControls(); renderOpponent();
+  renderGrid();        // ← 追加：後攻が自分の数字を選べる盤面に切り替える
+  updatePassNote();
+  updateControls();
+  renderOpponent();
 });
 
 $("#btnReveal").addEventListener("click", ()=>{
@@ -522,7 +523,6 @@ function cleanup(){
   if(state.baseP1!=null) state.history.p1.push(state.baseP1);
   if(state.baseP2!=null) state.history.p2.push(state.baseP2);
 
-  // 次ターンへ
   if(!maybeFinishByTarget()){
     renderGrid(); renderOpponent(); updateBadges();
     startTurn();
@@ -535,9 +535,9 @@ function endGame(){
   log(`<b>=== 終局 ===</b> ${msg}${state.deuce ? "（デュースの末）" : ""}`);
 }
 
-/* ========= コントロール活性（あなた指定の最小条件） ========= */
+/* ========= コントロール活性 ========= */
 function updateControls(){
-  // ライフナイン（後攻のみ）
+  // ライフナイン（後攻のみ活性）
   const qEnable = (state.phase==="follower" && !state.revealed);
   document.querySelectorAll(".qbtn").forEach(b=>b.disabled = !qEnable || state.qLocked);
   setInput.disabled = !(qEnable && state.qKey==="six" && !state.qLocked);
