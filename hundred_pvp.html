@@ -3,22 +3,17 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ハンドレッド / Hundred PvP ver 3.3.0</title>
+<title>ハンドレッド / Hundred PvP ver 3.2.7</title>
 <style>
   :root{
     --bg:#0e1a12; --bg2:#122216; --panel:#152a1b; --accent:#35c46e; --accent-2:#2aa55b;
     --text:#e7ffe7; --muted:#b9d8c0; --warn:#ffd37a; --bad:#ff8a8a; --good:#8affb9;
     --grid-used:#2a3a2f; --btn:#173d26; --btn-hover:#1f5333; --border:#2f6848;
-
-    /* グリッド用（レスポンシブ） */
-    --cols: 10;
-    --cell-min: 34px;
   }
-
   *{box-sizing:border-box}
   body{
     margin:0;
-    background:linear-gradient(180deg,var(--bg),var(--bg2));
+    background: linear-gradient(180deg,var(--bg) 0%, var(--bg2) 300px, var(--bg2) 100%) no-repeat fixed;
     color:var(--text);
     font-family:ui-sans-serif,system-ui,"Segoe UI",Roboto,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
   }
@@ -26,34 +21,11 @@
   h1{margin:0; font-size:20px; letter-spacing:.08em; color:var(--accent)}
   main{display:grid; grid-template-columns: 1fr; gap:12px; padding:12px}
 
-  /* ===== レイアウト（中央/右/左の3領域） ===== */
-  .wrap{
-    display:grid;
-    grid-template-columns: 420px 1fr 420px;
-    grid-template-areas: "left center right";
-    gap:12px;
-  }
-  .col-left{   grid-area:left; }
-  .col-center{ grid-area:center; }
-  .col-right{  grid-area:right; }
+  .wrap{display:grid; grid-template-columns: 1fr; gap:12px}
+  @media (min-width: 980px){ .wrap{grid-template-columns: 420px 1fr 420px} }
 
-  /* 狭い画面は縦積み：中央→右→左（操作優先） */
-  @media (max-width: 980px){
-    .wrap{
-      grid-template-columns: 1fr;
-      grid-template-areas:
-        "center"
-        "right"
-        "left";
-    }
-  }
-
-  .card{
-    background:var(--panel);
-    border:1px solid var(--border);
-    border-radius:14px; padding:14px;
-    box-shadow: 0 10px 20px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.04);
-  }
+  .card{background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:14px;
+    box-shadow: 0 10px 20px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.04);}
   .card h2{margin:0 0 10px; font-size:16px; color:var(--accent)}
   .row{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
   select, button, input{
@@ -67,35 +39,19 @@
   .accent:hover{filter:brightness(1.05)}
   .muted{color:var(--muted); font-size:12px}
 
-  /* 数字グリッド（可変列＆自動スケール） */
-  .grid{
-    display:grid;
-    grid-template-columns: repeat(var(--cols), minmax(var(--cell-min), 1fr));
-    gap:6px;
-  }
+  .grid{display:grid; grid-template-columns: repeat(10, minmax(0,1fr)); gap:6px}
   .cell{
-    padding: clamp(6px, 1.6vw, 10px) 0;
-    text-align:center; border-radius:10px; border:1px solid var(--border);
-    user-select:none; cursor:pointer; background:#13301e;
-    transition:transform .05s ease, background .15s ease;
-    font-variant-numeric:tabular-nums;
-    font-size: clamp(12px, 3.2vw, 16px);
+    padding:10px 0; text-align:center; border-radius:10px; border:1px solid var(--border);
+    user-select:none; cursor:pointer; background:#13301e; transition:transform .05s ease, background .15s ease;
+    font-variant-numeric:tabular-nums; font-size:14px;
   }
   .cell:hover{transform:translateY(-1px); background:#184029}
   .cell.used{background:var(--grid-used); color:#6e8a78; border-style:dashed; cursor:not-allowed}
   .cell.selected{outline:2px solid var(--accent); box-shadow:0 0 0 2px rgba(53,196,110,.25) inset}
 
-  /* 幅に応じて列数を減らす（読みやすさ優先） */
-  @media (max-width: 900px){ :root{ --cols: 8 } }
-  @media (max-width: 760px){ :root{ --cols: 7 } }
-  @media (max-width: 640px){ :root{ --cols: 6 } }
-  @media (max-width: 520px){ :root{ --cols: 5 } }
-  @media (max-width: 420px){ :root{ --cols: 4 } }
-
   .log{max-height:420px; overflow:auto; font-family:ui-monospace,Consolas,monospace; font-size:12px; line-height:1.5}
   .log b{color:var(--good)}
   .listbox{max-height:240px; overflow:auto; background:#0f2016; border:1px solid var(--border); border-radius:10px; padding:8px}
-  .kbd{padding:2px 6px; border:1px solid var(--border); border-radius:6px; background:#0f2016; font-size:12px}
   .sep{border-top:1px solid var(--border); margin:10px 0; opacity:.5}
 
   .qbar button{padding:8px 10px; font-size:14px}
@@ -111,11 +67,10 @@
 </head>
 <body>
 <header>
-  <h1>ハンドレッド / Hundred PvP ver 3.3.0（人間×人間／1台交互）</h1>
+  <h1>ハンドレッド / Hundred PvP ver 3.2.7（人間×人間／1台交互）</h1>
 </header>
 
 <main>
-  <!-- セットアップ -->
   <section class="card">
     <h2>セットアップ</h2>
     <div class="row" style="margin-bottom:8px">
@@ -137,13 +92,12 @@
   </section>
 
   <div class="wrap">
-    <!-- 左：進行・権利 -->
-    <section class="card col-left">
+    <section class="card">
       <h2>ターン／進行</h2>
       <div class="row" style="margin-bottom:8px">
         <div>ターン：<span id="turnNow">-</span>　
           先攻：<span id="turnStarter">-</span>　
-          質問者（後攻）：<span id="asker">-</span></div>
+          後攻：<span id="asker">-</span></div>
       </div>
       <div class="row" style="margin-bottom:8px">
         <div>スコア（先取 <span id="winTargetLabel">5</span>）：P1 <span id="sP1">0</span> - <span id="sP2">0</span> P2　（引分 <span id="sD">0</span>）</div>
@@ -175,22 +129,20 @@
       </div>
 
       <div class="row" style="margin-top:8px">
-        <button id="btnLock" class="accent" disabled>先攻決定</button>
+        <button id="btnLock" class="accent">先攻決定</button>
         <button id="btnReveal" class="accent" disabled>後攻決定</button>
       </div>
-      <div class="pass" id="passNote">— 今は <span class="who">P1</span> のターンです —</div>
+      <div class="pass" id="passNote">— 今は <span class="who">P1</span>（先攻）のターンです —</div>
     </section>
 
-    <!-- 中央：盤面 -->
-    <section class="card col-center">
+    <section class="card">
       <h2>盤面（いま操作中の人の未使用）</h2>
       <div id="grid" class="grid"></div>
     </section>
 
-    <!-- 右：相手情報＋ログ -->
-    <section class="card col-right">
+    <section class="card">
       <h2>相手情報</h2>
-      <div class="muted">右の一覧は<b>相手の未使用数字</b>。先攻/後攻の入替に合わせて自動で切り替わります。</div>
+      <div class="muted">右の一覧は<b>相手の未使用数字</b>。いま操作中の相手に自動で切り替わります。</div>
       <div class="sep"></div>
       <div><b>相手未使用（=残り）</b></div>
       <div id="listOpponent" class="listbox"></div>
@@ -227,7 +179,7 @@
 </main>
 
 <script>
-/* ========= 質問定義 ========= */
+/* ========= 定義 ========= */
 const QDEF = {
   one:   {type:"rule"},
   two:   {type:"self", op:"plus2"},
@@ -244,8 +196,10 @@ const QLABEL = {one:"ワン", two:"ツー", three:"スリー", four:"フォー",
 /* ========= 状態 ========= */
 const state = {
   turn: 0,
-  turnStarter: "p1", // p1 or p2（先攻）
+  initialStarter: "p1",
+  turnStarter: "p1", // 先攻
   asker: "p2",       // 後攻
+  phase: "starter",  // "starter" | "follower"
 
   winTarget: 5,
   deuce: false,
@@ -276,8 +230,21 @@ const setInput = $("#setInput");
 /* ========= ユーティリティ ========= */
 function log(line){ const div=document.createElement("div"); div.innerHTML=line; logEl.appendChild(div); logEl.scrollTop=logEl.scrollHeight; }
 function numArrayDesc(set){ return Array.from(set).sort((a,b)=>b-a); }
-function opponentSet(){ return (state.turnStarter==="p1") ? state.availableP2 : state.availableP1; }
-function renderOpponent(){ if(listOpponent) listOpponent.textContent = numArrayDesc(opponentSet()).join(", "); }
+function otherOf(w){ return w==="p1"?"p2":"p1"; }
+function whoLabel(w){ return w==="p1"? "P1" : "P2"; }
+
+/* 操作中の側 */
+function currentActor(){
+  if(state.phase==="starter") return state.turnStarter;
+  return otherOf(state.turnStarter);
+}
+
+/* ========= レンダリング ========= */
+function renderOpponent(){
+  const actor = currentActor();
+  const oppSet = (actor==="p1") ? state.availableP2 : state.availableP1;
+  if(listOpponent) listOpponent.textContent = numArrayDesc(oppSet).join(", ");
+}
 function updateBadges(){
   const p1Text = state.baseP1!=null? `確定(${state.baseP1})` : (state.selP1?`選択中(${state.selP1})`:"未確定");
   const p2Text = state.baseP2!=null? `確定(${state.baseP2})` : (state.selP2?`選択中(${state.selP2})`:"未確定");
@@ -285,7 +252,7 @@ function updateBadges(){
 }
 function renderGrid(){
   gridEl.innerHTML="";
-  const who = currentPicker();
+  const who = currentActor();
   const avail = (who==="p1")? state.availableP1 : state.availableP2;
   for(let n=100;n>=1;--n){
     const cell=document.createElement("div");
@@ -301,7 +268,7 @@ function renderGrid(){
         Array.from(gridEl.children).forEach(c=>c.classList.remove("selected"));
         const sel = (who==="p1")? state.selP1 : state.selP2;
         if(sel===n) cell.classList.add("selected");
-        updateBadges(); updateControls();
+        updateBadges(); updateControls(); renderOpponent();
       });
     }
     gridEl.appendChild(cell);
@@ -309,9 +276,39 @@ function renderGrid(){
 }
 function updateScore(){ $("#sP1").textContent=state.score.p1; $("#sP2").textContent=state.score.p2; $("#sD").textContent=state.score.draw; }
 
-/* ========= 先攻/後攻の選択の流れ ========= */
-function currentPicker(){ return state.turnStarter; }
-function currentAsker(){ return state.asker; }
+/* ========= ターン開始/遷移 ========= */
+function startTurn(){
+  state.turn += 1; $("#turnNow").textContent = String(state.turn);
+
+  if(state.turn===1){
+    state.turnStarter = state.initialStarter;
+  }else{
+    state.turnStarter = otherOf(state.turnStarter);
+  }
+  state.asker = otherOf(state.turnStarter);
+  state.phase = "starter";
+
+  $("#turnStarter").textContent = (state.turnStarter==="p1") ? "P1" : "P2";
+  $("#asker").textContent = (state.asker==="p1") ? "P1" : "P2";
+
+  state.selP1=null; state.baseP1=null; state.selP2=null; state.baseP2=null;
+  state.qKey=null; state.qAsker=null; state.qLocked=false; state.qSetN=[]; state.qAnswerPrivate=null;
+  state.revealed=false;
+
+  Array.from(gridEl.children).forEach(c=>c.classList.remove("selected"));
+
+  if(state.deuce){ statusEl.textContent = "デュース中（Win by 2）。先攻→後攻の順で操作してください。"; }
+  else if(state.turn===1){ statusEl.textContent = `対局開始。先取本数は ${state.winTarget}。`; }
+
+  updatePassNote();
+  renderGrid(); renderOpponent(); updateBadges(); updateControls();
+}
+
+function updatePassNote(){
+  const actor = currentActor();
+  const role = (actor===state.turnStarter) ? "先攻" : "後攻";
+  passNote.innerHTML = `— 今は <span class="who">${actor==="p1"?"P1":"P2"}</span>（${role}）のターンです —`;
+}
 
 /* ========= 初期化 ========= */
 function resetGame(){
@@ -327,21 +324,19 @@ function resetGame(){
   $("#winTargetLabel").textContent = String(state.winTarget);
 
   const starterSel = $("#starter").value;
-  state.turnStarter = (starterSel==="random") ? (Math.random()<0.5?"p1":"p2") : starterSel;
-  state.asker = (state.turnStarter==="p1") ? "p2" : "p1";
+  state.initialStarter = (starterSel==="random") ? (Math.random()<0.5?"p1":"p2") : starterSel;
+  state.turn = 0;
 
-  $("#turnNow").textContent = "0";
   logEl.innerHTML="";
-  statusEl.textContent = "対局開始。先攻が数字を選び、後攻がライフナインを選択します。";
-  updatePassNote();
-  renderGrid(); renderOpponent(); updateScore(); updateBadges();
-  nextTurn();
+  statusEl.textContent = "先攻が数字を選び、後攻がライフナインを選択します。";
+
+  startTurn(); // ターン1へ
 }
 
 /* ========= 判定 ========= */
 function judgeCore(a, b){
-  const aOdd=(a%2===1), bOdd=(b%2===1);
-  if(aOdd!==bOdd){ return aOdd? "A" : "B"; } // 奇数が勝ち（偶数は負け）
+  const aOdd = (a%2===1), bOdd = (b%2===1);
+  if(aOdd!==bOdd){ return aOdd? "A" : "B"; }
   const aM3=(a%3===0), bM3=(b%3===0);
   if(aM3 && bM3){ if(a<b) return "A"; if(a>b) return "B"; return "D"; }
   if(a>b) return "A"; if(a<b) return "B"; return "D";
@@ -362,28 +357,22 @@ function descSelf(op){
   return "";
 }
 
-/* ========= プレイヤー操作 ========= */
-function lockStarterIfReady(){
-  if(state.turnStarter==="p1"){ if(state.baseP1==null && state.selP1!=null){ state.baseP1 = state.selP1; } }
-  else { if(state.baseP2==null && state.selP2!=null){ state.baseP2 = state.selP2; } }
-}
-
-/* ========= プレイヤーUI（後攻時の質問） ========= */
+/* ========= ライフナイン UI ========= */
 const qButtons = document.querySelectorAll(".qbtn");
 qButtons.forEach(btn=>{
   btn.addEventListener("click", ()=>{
     if(state.revealed) return;
-    if(currentAsker()==="p1" && state.baseP2==null) return; // 後攻がp1のとき、先攻p2の基底が必要
-    if(currentAsker()==="p2" && state.baseP1==null) return;
+    if(state.phase!=="follower") return; // 後攻フェーズのみ
     if(state.qLocked) return;
 
     qButtons.forEach(b=>b.classList.remove("chosen"));
     btn.classList.add("chosen");
 
-    state.qKey = btn.dataset.q; state.qAsker = currentAsker();
+    state.qKey = btn.dataset.q; state.qAsker = state.asker;
+
     if(state.qKey==="six"){
       state.qSetN=[]; setInput.value=""; setInput.disabled=false;
-      log(`<b>${whoLabel(state.qAsker)}の権利</b>: シックスを選択。集合を入力してください。`);
+      log(`<b>${whoLabel(state.qAsker)}（後攻）の権利</b>: シックスを選択。集合を入力してください。`);
     }else{
       evalQuestionPreview();
       state.qLocked = true; updateControls();
@@ -393,8 +382,7 @@ qButtons.forEach(btn=>{
 
 setInput.addEventListener("change", ()=>{
   if(state.revealed || state.qKey!=="six" || state.qLocked===true) return;
-  const vals = setInput.value.trim().split(/\s+/).filter(s=>s.length>0)
-    .map(s=>parseInt(s,10)).filter(n=>Number.isInteger(n)&&n>=1&&n<=100);
+  const vals = setInput.value.trim().split(/\s+/).filter(s=>s.length>0).map(s=>parseInt(s,10)).filter(n=>Number.isInteger(n)&&n>=1&&n<=100);
   state.qSetN = [...new Set(vals)].slice(0,6);
   setInput.value = state.qSetN.join(" ");
   const target = (state.qAsker==="p1") ? state.baseP2 : state.baseP1;
@@ -421,61 +409,54 @@ function evalQuestionPreview(){
   }
 }
 
-function whoLabel(w){ return w==="p1"? "P1" : "P2"; }
-
-/* ========= ターン制御 ========= */
-function nextTurn(){
-  state.turn += 1; $("#turnNow").textContent = String(state.turn);
-
-  if(state.turn===1){
-    const starterSel=$("#starter").value;
-    state.turnStarter = (starterSel==="random") ? (Math.random()<0.5?"p1":"p2") : starterSel;
-  }else{
-    state.turnStarter = (state.turnStarter==="p1") ? "p2" : "p1";
-  }
-  state.asker = (state.turnStarter==="p1") ? "p2" : "p1";
-  $("#turnStarter").textContent = (state.turnStarter==="p1") ? "P1" : "P2";
-  $("#asker").textContent = (state.asker==="p1") ? "P1" : "P2";
-
-  state.selP1=null; state.baseP1=null; state.selP2=null; state.baseP2=null;
-  state.qKey=null; state.qAsker=null; state.qLocked=false; state.qSetN=[]; state.qAnswerPrivate=null;
-  state.revealed=false;
-
-  Array.from(gridEl.children).forEach(c=>c.classList.remove("selected"));
-
-  if(state.deuce){ statusEl.textContent = "デュース中（Win by 2）。先攻→後攻の順で操作してください。"; }
-  else if(state.turn===1){ statusEl.textContent = `対局開始。先取本数は ${state.winTarget}。`; }
-
-  updatePassNote();
-  renderGrid(); renderOpponent(); updateBadges(); updateControls();
-}
-
-function updatePassNote(){
-  passNote.innerHTML = `— 今は <span class="who">${(state.turnStarter==="p1"?"P1":"P2")}</span> のターンです —`;
-}
-
-/* ========= 公開（処理） ========= */
-function revealAndJudge(){
+/* ========= 決定系 ========= */
+$("#btnLock").addEventListener("click", ()=>{
   if(state.revealed) return;
+  if(state.phase!=="starter") return;
 
-  // 先攻ロック（未確定なら確定）
-  lockStarterIfReady();
-
-  // 先攻の基底チェック
-  if(state.turnStarter==="p1"){
-    if(state.baseP1==null){ alert("P1（先攻）の数字を選んでください。"); return; }
+  const starter = state.turnStarter;
+  if(starter==="p1"){
+    if(state.selP1==null){ alert("P1（先攻）の数字を選んでください。"); return; }
+    state.baseP1 = state.selP1; log("<b>P1（先攻）が数字を確定</b>");
   }else{
-    if(state.baseP2==null){ alert("P2（先攻）の数字を選んでください。"); return; }
+    if(state.selP2==null){ alert("P2（先攻）の数字を選んでください。"); return; }
+    state.baseP2 = state.selP2; log("<b>P2（先攻）が数字を確定</b>");
   }
 
-  // 後攻の確定（未確定なら確定）
-  const follower = (state.turnStarter==="p1")? "p2" : "p1";
-  if(follower==="p2"){ if(state.baseP2==null && state.selP2!=null) state.baseP2 = state.selP2; }
-  else { if(state.baseP1==null && state.selP1!=null) state.baseP1 = state.selP1; }
+  // ★ ここが重要：後攻フェーズへ遷移したら盤面を後攻側で再描画
+  state.phase = "follower";
+  renderGrid();        // ← 追加：後攻が自分の数字を選べる盤面に切り替える
+  updatePassNote();
+  updateControls();
+  renderOpponent();
+});
 
+$("#btnReveal").addEventListener("click", ()=>{
+  if(state.revealed) return;
+  if(state.phase!=="follower") return;
+
+  // 後攻の数を確定（未確定なら選択値で確定）
+  const follower = otherOf(state.turnStarter);
+  if(follower==="p1"){
+    if(state.baseP1==null){
+      if(state.selP1==null){ alert("P1（後攻）の数字を選んでください。"); return; }
+      state.baseP1 = state.selP1;
+    }
+  }else{
+    if(state.baseP2==null){
+      if(state.selP2==null){ alert("P2（後攻）の数字を選んでください。"); return; }
+      state.baseP2 = state.selP2;
+    }
+  }
+
+  revealAndJudge();
+});
+
+/* ========= 公開（判定） ========= */
+function revealAndJudge(){
   if(state.baseP1==null || state.baseP2==null){ alert("両者の数字を選んでください。"); return; }
 
-  // 質問の開示（質問系のみ）
+  // 質問開示
   if(state.qAsker){
     const def = QDEF[state.qKey];
     if(def){
@@ -488,15 +469,15 @@ function revealAndJudge(){
     }
   }
 
-  // 自己変換（後攻の数に適用）
+  // 自己変換（後攻のみ）
   let a = state.baseP1, b = state.baseP2; // A=P1, B=P2
   const def = QDEF[state.qKey] || null;
   if(def && def.type==="self"){
-    if(state.qAsker==="p1"){ a = applySelfOp(a, def.op); log(`<b>P1の権利: ${QLABEL[state.qKey]}</b> → 自分の数 ${descSelf(def.op)} = <b>${a}</b>`); }
-    else if(state.qAsker==="p2"){ b = applySelfOp(b, def.op); log(`<b>P2の権利: ${QLABEL[state.qKey]}</b> → 自分の数 ${descSelf(def.op)} = <b>${b}</b>`); }
+    if(state.qAsker==="p1"){ a = applySelfOp(a, def.op); log(`<b>P1（後攻）の権利: ${QLABEL[state.qKey]}</b> → 自分の数 ${descSelf(def.op)} = <b>${a}</b>`); }
+    else if(state.qAsker==="p2"){ b = applySelfOp(b, def.op); log(`<b>P2（後攻）の権利: ${QLABEL[state.qKey]}</b> → 自分の数 ${descSelf(def.op)} = <b>${b}</b>`); }
   }
 
-  // ワン（後攻のみ有効）
+  // ワン（後攻のみ）
   function resolveWithOne(aBase,bBase){
     if(def && state.qKey==="one"){
       const askerIsP1 = (state.qAsker==="p1");
@@ -508,12 +489,11 @@ function revealAndJudge(){
     }
     return null;
   }
+
   let res = resolveWithOne(a,b);
   if(!res){ res = judgeCore(a,b); }
 
-  if(res==="A") state.score.p1++;
-  else if(res==="B") state.score.p2++;
-  else state.score.draw++;
+  if(res==="A") state.score.p1++; else if(res==="B") state.score.p2++; else state.score.draw++;
   log(`<b>[公開]</b> P1=${a} / P2=${b} → <b>${res==="A"?"P1勝ち":res==="B"?"P2勝ち":"引分"}</b>`);
   updateScore();
 
@@ -543,9 +523,10 @@ function cleanup(){
   if(state.baseP1!=null) state.history.p1.push(state.baseP1);
   if(state.baseP2!=null) state.history.p2.push(state.baseP2);
 
-  renderGrid(); renderOpponent(); updateBadges();
-
-  if(!maybeFinishByTarget()) nextTurn();
+  if(!maybeFinishByTarget()){
+    renderGrid(); renderOpponent(); updateBadges();
+    startTurn();
+  }
 }
 
 function endGame(){
@@ -556,51 +537,40 @@ function endGame(){
 
 /* ========= コントロール活性 ========= */
 function updateControls(){
-  // 後攻の権利は、先攻の基底が確定してから
-  const qEnable = !state.revealed && (
-    (state.asker==="p1" && state.baseP2!=null) || (state.asker==="p2" && state.baseP1!=null)
-  );
+  // ライフナイン（後攻のみ活性）
+  const qEnable = (state.phase==="follower" && !state.revealed);
   document.querySelectorAll(".qbtn").forEach(b=>b.disabled = !qEnable || state.qLocked);
   setInput.disabled = !(qEnable && state.qKey==="six" && !state.qLocked);
 
-  // 先攻決定：先攻側が選択済みで未確定なら押せる
-  const canLock = !state.revealed && (
-    (state.turnStarter==="p1" && state.baseP1==null && state.selP1!=null) ||
-    (state.turnStarter==="p2" && state.baseP2==null && state.selP2!=null)
-  );
+  // 先攻決定：先攻フェーズで、操作中の側が数字を選択している
+  const actor = currentActor();
+  const canLock = (state.phase==="starter" && !state.revealed &&
+    ((actor==="p1" && state.selP1!=null) || (actor==="p2" && state.selP2!=null)));
   $("#btnLock").disabled = !canLock;
 
-  // 後攻決定：後攻フェーズ中で、後攻の数字選択済み ＆ ライフナイン確定済み（または未選択）
-  const follower = (state.turnStarter==="p1")? "p2" : "p1";
-  const followerHasSel = (follower==="p2") ? (state.baseP2!=null || state.selP2!=null) : (state.baseP1!=null || state.selP1!=null);
-  const qOk = (state.qKey==null) || (state.qLocked===true);
-  const bothLockedOrReady =
-    (state.baseP1!=null || (state.turnStarter==="p2")) &&
-    (state.baseP2!=null || (state.turnStarter==="p1")); // 先攻は確定済みであること
-  const canReveal = !state.revealed && followerHasSel && qOk && bothLockedOrReady;
+  // 後攻決定：後攻フェーズ AND 後攻の数字が選択/確定 AND ライフナインがあれば確定
+  const follower = otherOf(state.turnStarter);
+  let followerReady = false;
+  if(follower==="p1"){ followerReady = (state.selP1!=null || state.baseP1!=null); }
+  else{ followerReady = (state.selP2!=null || state.baseP2!=null); }
 
+  const canReveal = (
+    state.phase==="follower" &&
+    !state.revealed &&
+    followerReady &&
+    (state.qKey==null || state.qLocked===true)
+  );
   $("#btnReveal").disabled = !canReveal;
 
-  updateBadges(); renderOpponent();
+  updatePassNote();
+  updateBadges();
+  renderOpponent();
 }
 
-/* ========= イベント ========= */
-$("#btnLock").addEventListener("click", ()=>{
-  if(state.revealed) return;
-  if(state.turnStarter==="p1"){
-    if(state.selP1==null){ alert("P1の数字を選んでください。"); return; }
-    state.baseP1 = state.selP1; log("<b>P1が数字を確定</b>");
-  }else{
-    if(state.selP2==null){ alert("P2の数字を選んでください。"); return; }
-    state.baseP2 = state.selP2; log("<b>P2が数字を確定</b>");
-  }
-  updatePassNote(); updateControls();
-});
-
-$("#btnReveal").addEventListener("click", revealAndJudge);
+/* ========= 初期イベント ========= */
 $("#btnNew").addEventListener("click", resetGame);
 
-/* 初期起動 */
+/* 起動 */
 resetGame();
 </script>
 </body>
