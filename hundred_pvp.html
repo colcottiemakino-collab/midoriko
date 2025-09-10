@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ハンドレッド / Hundred PvP ver 3.2.5</title>
+<title>ハンドレッド / Hundred PvP ver 3.2.6</title>
 <style>
   :root{
     --bg:#0e1a12; --bg2:#122216; --panel:#152a1b; --accent:#35c46e; --accent-2:#2aa55b;
@@ -13,7 +13,7 @@
   *{box-sizing:border-box}
   body{
     margin:0;
-    /* 上部のみなめらか→以降は一定色。色味はそのまま。 */
+    /* 上だけなだらか→以降は一定色。色味は変えない */
     background: linear-gradient(180deg,var(--bg) 0%, var(--bg2) 300px, var(--bg2) 100%) no-repeat fixed;
     color:var(--text);
     font-family:ui-sans-serif,system-ui,"Segoe UI",Roboto,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
@@ -68,7 +68,7 @@
 </head>
 <body>
 <header>
-  <h1>ハンドレッド / Hundred PvP ver 3.2.5（人間×人間／1台交互）</h1>
+  <h1>ハンドレッド / Hundred PvP ver 3.2.6（人間×人間／1台交互）</h1>
 </header>
 
 <main>
@@ -455,7 +455,7 @@ $("#btnReveal").addEventListener("click", ()=>{
 function revealAndJudge(){
   if(state.baseP1==null || state.baseP2==null){ alert("両者の数字を選んでください。"); return; }
 
-  // 公開時：質問を開示
+  // 質問開示
   if(state.qAsker){
     const def = QDEF[state.qKey];
     if(def){
@@ -468,7 +468,7 @@ function revealAndJudge(){
     }
   }
 
-  // 自己変換（後攻の数に適用）
+  // 自己変換（後攻のみ）
   let a = state.baseP1, b = state.baseP2; // A=P1, B=P2
   const def = QDEF[state.qKey] || null;
   if(def && def.type==="self"){
@@ -476,7 +476,7 @@ function revealAndJudge(){
     else if(state.qAsker==="p2"){ b = applySelfOp(b, def.op); log(`<b>P2（後攻）の権利: ${QLABEL[state.qKey]}</b> → 自分の数 ${descSelf(def.op)} = <b>${b}</b>`); }
   }
 
-  // ワン（後攻のみ有効）
+  // ワン（後攻のみ）
   function resolveWithOne(aBase,bBase){
     if(def && state.qKey==="one"){
       const askerIsP1 = (state.qAsker==="p1");
@@ -535,25 +535,31 @@ function endGame(){
   log(`<b>=== 終局 ===</b> ${msg}${state.deuce ? "（デュースの末）" : ""}`);
 }
 
-/* ========= コントロール活性（あなたの条件に厳密準拠） ========= */
+/* ========= コントロール活性（あなた指定の最小条件） ========= */
 function updateControls(){
-  // ライフナイン（後攻のみ有効）
+  // ライフナイン（後攻のみ）
   const qEnable = (state.phase==="follower" && !state.revealed);
   document.querySelectorAll(".qbtn").forEach(b=>b.disabled = !qEnable || state.qLocked);
   setInput.disabled = !(qEnable && state.qKey==="six" && !state.qLocked);
 
-  // 先攻決定：先攻フェーズで、操作中の側が数字を選んでいる
+  // 先攻決定：先攻フェーズで、操作中の側が数字を選択している
   const actor = currentActor();
   const canLock = (state.phase==="starter" && !state.revealed &&
     ((actor==="p1" && state.selP1!=null) || (actor==="p2" && state.selP2!=null)));
   $("#btnLock").disabled = !canLock;
 
-  // 後攻決定：後攻フェーズ かつ 後攻の数字が選択 or 確定 かつ 質問があるなら確定済み
+  // 後攻決定：後攻フェーズ AND 後攻の数字が選択/確定 AND ライフナインがあれば確定
   const follower = otherOf(state.turnStarter);
-  const followerReady = (follower==="p1") ? (state.baseP1!=null || state.selP1!=null)
-                                          : (state.baseP2!=null || state.selP2!=null);
-  const qOk = (state.qKey==null) || (state.qLocked===true);
-  const canReveal = (state.phase==="follower" && !state.revealed && followerReady && qOk);
+  let followerReady = false;
+  if(follower==="p1"){ followerReady = (state.selP1!=null || state.baseP1!=null); }
+  else{ followerReady = (state.selP2!=null || state.baseP2!=null); }
+
+  const canReveal = (
+    state.phase==="follower" &&
+    !state.revealed &&
+    followerReady &&
+    (state.qKey==null || state.qLocked===true)
+  );
   $("#btnReveal").disabled = !canReveal;
 
   updatePassNote();
@@ -562,7 +568,6 @@ function updateControls(){
 }
 
 /* ========= 初期イベント ========= */
-document.querySelectorAll(".qbtn").forEach(()=>{}); // 参照安定用
 $("#btnNew").addEventListener("click", resetGame);
 
 /* 起動 */
