@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ハンドレッド / Hundred PvP ver 3.2.3</title>
+<title>ハンドレッド / Hundred PvP ver 3.2.5</title>
 <style>
   :root{
     --bg:#0e1a12; --bg2:#122216; --panel:#152a1b; --accent:#35c46e; --accent-2:#2aa55b;
@@ -13,7 +13,7 @@
   *{box-sizing:border-box}
   body{
     margin:0;
-    /* 好きな色味は変えず、上部だけ滑らかに→以降は一定色で均一 */
+    /* 上部のみなめらか→以降は一定色。色味はそのまま。 */
     background: linear-gradient(180deg,var(--bg) 0%, var(--bg2) 300px, var(--bg2) 100%) no-repeat fixed;
     color:var(--text);
     font-family:ui-sans-serif,system-ui,"Segoe UI",Roboto,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
@@ -68,7 +68,7 @@
 </head>
 <body>
 <header>
-  <h1>ハンドレッド / Hundred PvP ver 3.2.3（人間×人間／1台交互）</h1>
+  <h1>ハンドレッド / Hundred PvP ver 3.2.5（人間×人間／1台交互）</h1>
 </header>
 
 <main>
@@ -143,7 +143,7 @@
 
     <section class="card">
       <h2>相手情報</h2>
-      <div class="muted">右の一覧は<b>相手の未使用数字</b>。先攻/後攻やフェーズの入替に合わせて自動で切り替わります。</div>
+      <div class="muted">右の一覧は<b>相手の未使用数字</b>。いま操作中の相手に自動で切り替わります。</div>
       <div class="sep"></div>
       <div><b>相手未使用（=残り）</b></div>
       <div id="listOpponent" class="listbox"></div>
@@ -232,6 +232,7 @@ const setInput = $("#setInput");
 function log(line){ const div=document.createElement("div"); div.innerHTML=line; logEl.appendChild(div); logEl.scrollTop=logEl.scrollHeight; }
 function numArrayDesc(set){ return Array.from(set).sort((a,b)=>b-a); }
 function otherOf(w){ return w==="p1"?"p2":"p1"; }
+function whoLabel(w){ return w==="p1"? "P1" : "P2"; }
 
 /* 操作中の側 */
 function currentActor(){
@@ -268,7 +269,7 @@ function renderGrid(){
         Array.from(gridEl.children).forEach(c=>c.classList.remove("selected"));
         const sel = (who==="p1")? state.selP1 : state.selP2;
         if(sel===n) cell.classList.add("selected");
-        updateBadges(); updateControls();
+        updateBadges(); updateControls(); renderOpponent();
       });
     }
     gridEl.appendChild(cell);
@@ -363,18 +364,16 @@ qButtons.forEach(btn=>{
   btn.addEventListener("click", ()=>{
     if(state.revealed) return;
     if(state.phase!=="follower") return; // 後攻フェーズのみ
-    // 後攻側から見た先攻の基底が必要
-    if(state.asker==="p1" && state.baseP2==null) return;
-    if(state.asker==="p2" && state.baseP1==null) return;
     if(state.qLocked) return;
 
     qButtons.forEach(b=>b.classList.remove("chosen"));
     btn.classList.add("chosen");
 
     state.qKey = btn.dataset.q; state.qAsker = state.asker;
+
     if(state.qKey==="six"){
       state.qSetN=[]; setInput.value=""; setInput.disabled=false;
-      log(`<b>${whoLabel(state.qAsker)}の権利</b>: シックスを選択。集合を入力してください。`);
+      log(`<b>${whoLabel(state.qAsker)}（後攻）の権利</b>: シックスを選択。集合を入力してください。`);
     }else{
       evalQuestionPreview();
       state.qLocked = true; updateControls();
@@ -387,6 +386,7 @@ setInput.addEventListener("change", ()=>{
   const vals = setInput.value.trim().split(/\s+/).filter(s=>s.length>0).map(s=>parseInt(s,10)).filter(n=>Number.isInteger(n)&&n>=1&&n<=100);
   state.qSetN = [...new Set(vals)].slice(0,6);
   setInput.value = state.qSetN.join(" ");
+  // 後攻から見た先攻の基底（phase=followerなら必ず確定済み）
   const target = (state.qAsker==="p1") ? state.baseP2 : state.baseP1;
   const truth = new Set(state.qSetN).has(target);
   state.qAnswerPrivate = truth;
@@ -410,7 +410,6 @@ function evalQuestionPreview(){
     log(`<b>${whoLabel(state.qAsker)}の権利</b>: ${QLABEL[state.qKey]} を選択（効果は公開時に適用）`);
   }
 }
-function whoLabel(w){ return w==="p1"? "P1" : "P2"; }
 
 /* ========= 決定系 ========= */
 $("#btnLock").addEventListener("click", ()=>{
@@ -426,7 +425,7 @@ $("#btnLock").addEventListener("click", ()=>{
     state.baseP2 = state.selP2; log("<b>P2（先攻）が数字を確定</b>");
   }
 
-  // 後攻フェーズへ遷移
+  // 後攻フェーズへ
   state.phase = "follower";
   updatePassNote(); updateControls(); renderOpponent();
 });
@@ -456,7 +455,7 @@ $("#btnReveal").addEventListener("click", ()=>{
 function revealAndJudge(){
   if(state.baseP1==null || state.baseP2==null){ alert("両者の数字を選んでください。"); return; }
 
-  // 公開時に質問結果を開示（質問系のみ）
+  // 公開時：質問を開示
   if(state.qAsker){
     const def = QDEF[state.qKey];
     if(def){
@@ -534,33 +533,27 @@ function endGame(){
   const msg = `最終スコア：P1 ${state.score.p1} - ${state.score.p2} P2`;
   statusEl.textContent = msg + (state.deuce ? "（デュースの末）" : "") + "　新しい対局で再開できます。";
   log(`<b>=== 終局 ===</b> ${msg}${state.deuce ? "（デュースの末）" : ""}`);
-  // ここで終了（次ターンへは進めない）
 }
 
-/* ========= コントロール活性（重要：後攻決定の条件を簡潔化） ========= */
+/* ========= コントロール活性（あなたの条件に厳密準拠） ========= */
 function updateControls(){
-  // ライフナイン（後攻の権利）
-  const qEnable = (!state.revealed && state.phase==="follower" && (
-    (state.asker==="p1" && state.baseP2!=null) || (state.asker==="p2" && state.baseP1!=null)
-  ));
+  // ライフナイン（後攻のみ有効）
+  const qEnable = (state.phase==="follower" && !state.revealed);
   document.querySelectorAll(".qbtn").forEach(b=>b.disabled = !qEnable || state.qLocked);
   setInput.disabled = !(qEnable && state.qKey==="six" && !state.qLocked);
 
-  // 先攻決定（先攻フェーズで、先攻が選択済みか）
+  // 先攻決定：先攻フェーズで、操作中の側が数字を選んでいる
   const actor = currentActor();
-  const canLock = (!state.revealed && state.phase==="starter" && (
-    (actor==="p1" && state.selP1!=null) || (actor==="p2" && state.selP2!=null)
-  ));
+  const canLock = (state.phase==="starter" && !state.revealed &&
+    ((actor==="p1" && state.selP1!=null) || (actor==="p2" && state.selP2!=null)));
   $("#btnLock").disabled = !canLock;
 
-  // 後攻決定（後攻フェーズで、先攻は確定済み＋後攻は選択 or 確定済み）＆質問があれば確定済み
+  // 後攻決定：後攻フェーズ かつ 後攻の数字が選択 or 確定 かつ 質問があるなら確定済み
   const follower = otherOf(state.turnStarter);
-  const starterReady = (state.turnStarter==="p1") ? state.baseP1!=null : state.baseP2!=null;
   const followerReady = (follower==="p1") ? (state.baseP1!=null || state.selP1!=null)
                                           : (state.baseP2!=null || state.selP2!=null);
   const qOk = (state.qKey==null) || (state.qLocked===true);
-
-  const canReveal = (!state.revealed && state.phase==="follower" && starterReady && followerReady && qOk);
+  const canReveal = (state.phase==="follower" && !state.revealed && followerReady && qOk);
   $("#btnReveal").disabled = !canReveal;
 
   updatePassNote();
@@ -569,6 +562,7 @@ function updateControls(){
 }
 
 /* ========= 初期イベント ========= */
+document.querySelectorAll(".qbtn").forEach(()=>{}); // 参照安定用
 $("#btnNew").addEventListener("click", resetGame);
 
 /* 起動 */
