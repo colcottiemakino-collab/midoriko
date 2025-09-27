@@ -1,0 +1,20 @@
+{
+  "name": "ハンドレッド / Hundred",
+  "short_name": "Hundred",
+  "start_url": "/midoriko/",
+  "display": "standalone",
+  "background_color": "#0e1a12",
+  "theme_color": "#35c46e",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
