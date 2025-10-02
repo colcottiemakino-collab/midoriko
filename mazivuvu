@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>カードバトル試作</title>
+  <style>
+    body { font-family: sans-serif; background:#fafafa; }
+    #log { white-space: pre-line; border:1px solid #999; padding:10px; margin-top:10px; height:400px; overflow:auto; background:#fff;}
+    .card-img { height: 120px; }
+    .vs { font-weight:bold; margin:0 10px; }
+  </style>
+</head>
+<body>
+
+<h2>カードバトル試作（PvEテスト）</h2>
+
+<button onclick="startBattle()">NPC戦開始</button>
+
+<div id="log"></div>
+
+<script>
+// ========================
+// カード定義（辞書）
+// ========================
+const cards = {
+  "N001": { name:"プロトタイプ・フロント", cost:5, hp:6, attackType:"front", attack:3 },
+  "N002": { name:"プロトタイプ・センター", cost:5, hp:5, attackType:"center", attack:2 },
+  "N003": { name:"プロトタイプ・バック", cost:5, hp:4, attackType:"back", attack:1 }
+};
+
+// ========================
+// ユニットクラス
+// ========================
+class Unit {
+  constructor(cardId, side, fieldSlot){
+    const data = cards[cardId];
+    this.id = cardId;
+    this.name = data.name;
+    this.maxHp = data.hp;
+    this.damage = 0;
+    this.attackType = data.attackType;
+    this.attack = data.attack;
+    this.alive = true;
+    this.side = side;        // "player" or "enemy"
+    this.fieldSlot = fieldSlot; // 0=前衛,1=中衛,2=後衛
+  }
+  isDead(){ return this.damage >= this.maxHp; }
+}
+
+// ========================
+// フィールド：3スロット（前衛・中衛・後衛）
+// ========================
+class Field {
+  constructor(name){
+    this.name = name;
+    this.slots = [null,null,null]; // 0=前衛,1=中衛,2=後衛
+  }
+  addUnit(unit, slot){ this.slots[slot] = unit; }
+  getFront(){ return this.slots[0]; }
+  slideForward(){
+    // 前衛が空の場合、中衛→前衛, 後衛→中衛, 後衛=null
+    if(!this.slots[0]){
+      this.slots[0] = this.slots[1];
+      this.slots[1] = this.slots[2];
+      this.slots[2] = null;
+    }
+  }
+}
+
+// ========================
+// バトル管理
+// ========================
+class Battle {
+  constructor(){
+    this.turn = 1;
+    this.log = "";
+    this.fieldsPlayer = {
+      A: new Field("A"), B: new Field("B"), C: new Field("C")
+    };
+    this.fieldsEnemy = {
+      A: new Field("A"), B: new Field("B"), C: new Field("C")
+    };
+    this.playerHp = 10;
+    this.enemyHp = 10;
+  }
+
+  addLog(text){ this.log += text + "\n"; }
+
+  setup(){
+    // 仮配置：Aフィールドに前衛だけ置く
+    this.fieldsPlayer.A.addUnit(new Unit("N001","player",0),0);
+    this.fieldsPlayer.A.addUnit(new Unit("N002","player",1),1);
+    this.fieldsPlayer.A.addUnit(new Unit("N003","player",2),2);
+
+    this.fieldsEnemy.A.addUnit(new Unit("N001","enemy",0),0);
+    this.fieldsEnemy.A.addUnit(new Unit("N002","enemy",1),1);
+    this.fieldsEnemy.A.addUnit(new Unit("N003","enemy",2),2);
+  }
+
+  randomField(){
+    const fields = ["A","B","C"];
+    return fields[Math.floor(Math.random()*3)];
+  }
+
+  attackPhase(fieldName){
+    const pf = this.fieldsPlayer[fieldName];
+    const ef = this.fieldsEnemy[fieldName];
+    const pFront = pf.getFront();
+    const eFront = ef.getFront();
+
+    this.addLog(`=== ターン${this.turn} 通常攻撃フェイズ ===`);
+    this.addLog(`フィールド${fieldName}が選ばれた`);
+
+    // 表示用の前衛画像（ダミー:名前だけ）
+    let leftImg = eFront ? `[${eFront.name}]` : "[なし]";
+    let rightImg = pFront ? `[${pFront.name}]` : "[なし]";
+    this.addLog(`${leftImg}   VS   ${rightImg}`);
+
+    // 攻撃処理：プレイヤー前衛→敵前衛 or 本体
+    if(pFront){
+      if(eFront){
+        eFront.damage += pFront.attack;
+        this.addLog(`→ ${pFront.name}が${eFront.name}に${pFront.attack}ダメージ！`);
+      } else {
+        this.enemyHp -= pFront.attack;
+        this.addLog(`→ ${pFront.name}が敵本体に${pFront.attack}ダメージ！ 敵HP:${this.enemyHp}`);
+      }
+    }
+
+    // 攻撃処理：敵前衛→プレイヤー前衛 or 本体
+    if(eFront){
+      if(pFront && !eFront.isDead()){
+        pFront.damage += eFront.attack;
+        this.addLog(`→ ${eFront.name}が${pFront.name}に${eFront.attack}ダメージ！`);
+      } else if(!eFront.isDead()){
+        this.playerHp -= eFront.attack;
+        this.addLog(`→ ${eFront.name}が本体に${eFront.attack}ダメージ！ 自分HP:${this.playerHp}`);
+      }
+    }
+
+    // フェイズ終了：死亡判定とスライド
+    [pf, ef].forEach(f=>{
+      if(f.getFront() && f.getFront().isDead()){
+        this.addLog(`→ ${f.getFront().name}は退場した！`);
+        f.slots[0] = null;
+        f.slideForward();
+        if(f.getFront()){
+          this.addLog(`→ ${f.getFront().name}が前衛に移動！`);
+        } else {
+          this.addLog(`→ 前衛は空になった`);
+        }
+      }
+    });
+  }
+
+  run(){
+    this.setup();
+    while(this.playerHp>0 && this.enemyHp>0 && this.turn<=10){
+      const f = this.randomField();
+      this.attackPhase(f);
+      this.turn++;
+    }
+    if(this.playerHp<=0) this.addLog("★ 敗北…");
+    else if(this.enemyHp<=0) this.addLog("★ 勝利！");
+    else this.addLog("★ 引き分け（ターン上限）");
+  }
+}
+
+// ========================
+// 実行
+// ========================
+function startBattle(){
+  const battle = new Battle();
+  battle.run();
+  document.getElementById("log").textContent = battle.log;
+}
+</script>
+
+</body>
+</html>
